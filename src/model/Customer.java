@@ -2,19 +2,19 @@ package model;
 
 public class Customer {
     private int customerId;
-    private String firstName;
     private String lastName;
+    private String firstName;
     private String email;
-    private String phoneNumber;
+    private String phone;
     private String address;
 
     public Customer(int customerId, String firstName, String lastName, String email, 
-                   String phoneNumber, String address) {
+                   String phone, String address) {
         this.customerId = customerId;
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
-        this.phoneNumber = phoneNumber;
+        this.phone = phone;
         this.address = address;
     }
 
@@ -31,11 +31,12 @@ public class Customer {
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
-    public String getPhoneNumber() { return phoneNumber; }
-    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
 
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
+
 
     @Override
     public String toString() {

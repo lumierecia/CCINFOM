@@ -10,94 +10,126 @@ public class Order {
     private Timestamp orderDateTime;
     private String orderType;
     private String orderStatus;
-    private List<OrderItem> orderItems;
+    private String paymentStatus;
+    private double totalAmount;
+    private String paymentMethod;
+    private List<OrderItem> items;
     private List<Integer> assignedEmployees;
 
     public Order() {
-        this.orderItems = new ArrayList<>();
+        this.items = new ArrayList<>();
         this.assignedEmployees = new ArrayList<>();
+        this.totalAmount = 0.0;
     }
 
-    public Order(int orderId, int customerId, Timestamp orderDateTime, String orderType, String orderStatus) {
+    public Order(int orderId, int customerId, Timestamp orderDateTime, String orderType, 
+                String orderStatus, String paymentStatus, double totalAmount, String paymentMethod) {
         this.orderId = orderId;
         this.customerId = customerId;
         this.orderDateTime = orderDateTime;
         this.orderType = orderType;
         this.orderStatus = orderStatus;
-        this.orderItems = new ArrayList<>();
+        this.paymentStatus = paymentStatus;
+        this.totalAmount = totalAmount;
+        this.paymentMethod = paymentMethod;
+        this.items = new ArrayList<>();
         this.assignedEmployees = new ArrayList<>();
     }
 
-    // Getters
+    // Getters and setters
     public int getOrderId() {
         return orderId;
+    }
+
+    public void setOrderId(int orderId) {
+        this.orderId = orderId;
     }
 
     public int getCustomerId() {
         return customerId;
     }
 
-    public Timestamp getOrderDateTime() {
-        return orderDateTime;
-    }
-
-    public String getOrderType() {
-        return orderType;
-    }
-
-    public String getOrderStatus() {
-        return orderStatus;
-    }
-
-    public List<OrderItem> getOrderItems() {
-        return orderItems;
-    }
-
-    public List<Integer> getAssignedEmployees() {
-        return assignedEmployees;
-    }
-
-    // Setters
-    public void setOrderId(int orderId) {
-        this.orderId = orderId;
-    }
-
     public void setCustomerId(int customerId) {
         this.customerId = customerId;
+    }
+
+    public Timestamp getOrderDateTime() {
+        return orderDateTime;
     }
 
     public void setOrderDateTime(Timestamp orderDateTime) {
         this.orderDateTime = orderDateTime;
     }
 
+    public String getOrderType() {
+        return orderType;
+    }
+
     public void setOrderType(String orderType) {
         this.orderType = orderType;
+    }
+
+    public String getOrderStatus() {
+        return orderStatus;
     }
 
     public void setOrderStatus(String orderStatus) {
         this.orderStatus = orderStatus;
     }
 
-    public void setOrderItems(List<OrderItem> orderItems) {
-        this.orderItems = orderItems;
+    public String getPaymentStatus() {
+        return paymentStatus;
+    }
+
+    public void setPaymentStatus(String paymentStatus) {
+        this.paymentStatus = paymentStatus;
+    }
+
+    public double getTotalAmount() {
+        return totalAmount;
+    }
+
+    public void setTotalAmount(double totalAmount) {
+        this.totalAmount = totalAmount;
+    }
+
+    public String getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public List<OrderItem> getItems() {
+        return items;
+    }
+
+    public void setItems(List<OrderItem> items) {
+        this.items = items;
+    }
+
+    public void addItem(OrderItem item) {
+        items.add(item);
+    }
+
+    public void removeItem(OrderItem item) {
+        items.remove(item);
+    }
+
+    public List<Integer> getAssignedEmployees() {
+        return assignedEmployees;
     }
 
     public void setAssignedEmployees(List<Integer> assignedEmployees) {
         this.assignedEmployees = assignedEmployees;
     }
 
-    // Helper methods
-    public void addOrderItem(OrderItem item) {
-        if (this.orderItems == null) {
-            this.orderItems = new ArrayList<>();
-        }
-        this.orderItems.add(item);
+    public void addAssignedEmployee(int employeeId) {
+        assignedEmployees.add(employeeId);
     }
 
-    public void addAssignedEmployee(int employeeId) {
-        if (this.assignedEmployees == null) {
-            this.assignedEmployees = new ArrayList<>();
-        }
-        this.assignedEmployees.add(employeeId);
+    public void removeAssignedEmployee(int employeeId) {
+        assignedEmployees.remove(Integer.valueOf(employeeId));
     }
 } 

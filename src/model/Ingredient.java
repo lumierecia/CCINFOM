@@ -7,7 +7,8 @@ import java.util.Map;
 public class Ingredient {
     private int ingredientId;
     private String name;
-    private String unit;
+    private int unitId;
+    private String unitName;  // For display purposes
     private double quantityInStock;
     private double minimumStockLevel;
     private double costPerUnit;
@@ -15,12 +16,13 @@ public class Ingredient {
     private int lastRestockedBy;
     private Map<Integer, SupplierPrice> supplierPrices;
 
-    public Ingredient(int ingredientId, String name, String unit, double quantityInStock, 
-                     double minimumStockLevel, double costPerUnit, Timestamp lastRestockDate, 
+    public Ingredient(int ingredientId, String name, int unitId, String unitName, double quantityInStock,
+                     double minimumStockLevel, double costPerUnit, Timestamp lastRestockDate,
                      int lastRestockedBy) {
         this.ingredientId = ingredientId;
         this.name = name;
-        this.unit = unit;
+        this.unitId = unitId;
+        this.unitName = unitName;
         this.quantityInStock = quantityInStock;
         this.minimumStockLevel = minimumStockLevel;
         this.costPerUnit = costPerUnit;
@@ -77,25 +79,29 @@ public class Ingredient {
     // Getters
     public int getIngredientId() { return ingredientId; }
     public String getName() { return name; }
-    public String getUnit() { return unit; }
+    public int getUnitId() { return unitId; }
+    public String getUnitName() { return unitName; }
     public double getQuantityInStock() { return quantityInStock; }
     public double getMinimumStockLevel() { return minimumStockLevel; }
     public double getCostPerUnit() { return costPerUnit; }
     public Timestamp getLastRestockDate() { return lastRestockDate; }
     public int getLastRestockedBy() { return lastRestockedBy; }
+    public Map<Integer, SupplierPrice> getSupplierPrices() { return supplierPrices; }
 
     // Setters
     public void setIngredientId(int ingredientId) { this.ingredientId = ingredientId; }
     public void setName(String name) { this.name = name; }
-    public void setUnit(String unit) { this.unit = unit; }
+    public void setUnitId(int unitId) { this.unitId = unitId; }
+    public void setUnitName(String unitName) { this.unitName = unitName; }
     public void setQuantityInStock(double quantityInStock) { this.quantityInStock = quantityInStock; }
     public void setMinimumStockLevel(double minimumStockLevel) { this.minimumStockLevel = minimumStockLevel; }
     public void setCostPerUnit(double costPerUnit) { this.costPerUnit = costPerUnit; }
     public void setLastRestockDate(Timestamp lastRestockDate) { this.lastRestockDate = lastRestockDate; }
     public void setLastRestockedBy(int lastRestockedBy) { this.lastRestockedBy = lastRestockedBy; }
+    public void setSupplierPrices(Map<Integer, SupplierPrice> supplierPrices) { this.supplierPrices = supplierPrices; }
 
     @Override
     public String toString() {
-        return name + " (" + quantityInStock + " " + unit + ")";
+        return name + " (" + quantityInStock + " " + unitName + ")";
     }
 } 

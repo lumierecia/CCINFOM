@@ -9,6 +9,10 @@ public class Supplier {
     private String address;
     private String status;
 
+    public Supplier(int supplierId, String name, String contactPerson, String email, String phone, String address) {
+        this(supplierId, name, contactPerson, email, phone, address, "Active");
+    }
+
     public Supplier(int supplierId, String name, String contactPerson, String email, String phone, String address, String status) {
         this.supplierId = supplierId;
         this.name = name;

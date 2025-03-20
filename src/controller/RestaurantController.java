@@ -1,51 +1,276 @@
 package controller;
 
-import model.*;
-import dao.*;
-import java.util.List;
+import dao.OrderDAO;
+import dao.CustomerDAO;
+import dao.EmployeeDAO;
+import dao.IngredientDAO;
+import dao.SupplierDAO;
+import model.Order;
+import model.Customer;
+import model.Employee;
+import model.Inventory;
+import model.OrderItem;
+import model.Supplier;
+import util.DatabaseConnection;
+import java.sql.*;
 import java.util.ArrayList;
+import java.util.List;
+import javax.swing.JOptionPane;
 
 public class RestaurantController {
-    private RestaurantDAO restaurantDAO;
     private OrderDAO orderDAO;
     private CustomerDAO customerDAO;
     private EmployeeDAO employeeDAO;
+    private IngredientDAO ingredientDAO;
+    private SupplierDAO supplierDAO;
 
     public RestaurantController() {
-        this.restaurantDAO = new RestaurantDAO();
         this.orderDAO = new OrderDAO();
         this.customerDAO = new CustomerDAO();
         this.employeeDAO = new EmployeeDAO();
+        this.ingredientDAO = new IngredientDAO();
+        this.supplierDAO = new SupplierDAO();
     }
 
-    // Restaurant methods
-    public List<Restaurant> getAllRestaurants() {
-        return restaurantDAO.getAllRestaurants();
+    private Connection getConnection() throws SQLException {
+        return DatabaseConnection.getConnection();
     }
 
-    public Restaurant getRestaurantById(int id) {
-        return restaurantDAO.getRestaurantById(id);
+    // Category Management Methods
+    public List<String> getAllCategories() {
+        List<String> categories = new ArrayList<>();
+        String query = "SELECT category_name FROM Categories ORDER BY category_name";
+        
+        try (PreparedStatement stmt = getConnection().prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                categories.add(rs.getString("category_name"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                    "Failed to fetch categories: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+        return categories;
     }
 
-    public boolean addRestaurant(String name, String location, String cuisine, double rating) {
-        Restaurant restaurant = new Restaurant(0, name, location, cuisine, rating);
-        return restaurantDAO.addRestaurant(restaurant);
+    private int getCategoryId(String categoryName) {
+        String query = "SELECT category_id FROM Categories WHERE category_name = ?";
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setString(1, categoryName);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("category_id");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                    "Failed to get category ID: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+        return -1;
     }
 
-    public boolean updateRestaurant(int id, String name, String location, String cuisine, double rating) {
-        Restaurant restaurant = new Restaurant(id, name, location, cuisine, rating);
-        return restaurantDAO.updateRestaurant(restaurant);
+    // Inventory Management Methods
+    public List<Inventory> getAllInventoryItems() {
+        List<Inventory> items = new ArrayList<>();
+        String query = """
+            SELECT i.*, c.category_name 
+            FROM InventoryItems i 
+            JOIN Categories c ON i.category_id = c.category_id 
+            ORDER BY i.product_name
+        """;
+        
+        try (PreparedStatement stmt = getConnection().prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                items.add(new Inventory(
+                    rs.getInt("product_id"),
+                    rs.getString("product_name"),
+                    rs.getString("category_name"),
+                    rs.getInt("quantity"),
+                    rs.getDouble("make_price"),
+                    rs.getDouble("sell_price")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                    "Failed to fetch inventory items: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+        return items;
     }
 
-    public boolean deleteRestaurant(int id) {
-        return restaurantDAO.deleteRestaurant(id);
+    public List<Inventory> getInventoryItemsByCategory(String categoryName) {
+        List<Inventory> items = new ArrayList<>();
+        String query = """
+            SELECT i.*, c.category_name 
+            FROM InventoryItems i 
+            JOIN Categories c ON i.category_id = c.category_id 
+            WHERE c.category_name = ? 
+            ORDER BY i.product_name
+        """;
+        
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setString(1, categoryName);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    items.add(new Inventory(
+                        rs.getInt("product_id"),
+                        rs.getString("product_name"),
+                        rs.getString("category_name"),
+                        rs.getInt("quantity"),
+                        rs.getDouble("make_price"),
+                        rs.getDouble("sell_price")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                    "Failed to fetch inventory items by category: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+        return items;
     }
 
-    public List<Restaurant> searchRestaurants(String searchTerm) {
-        return restaurantDAO.searchRestaurants(searchTerm);
+    public Inventory getInventoryItemById(int id) {
+        String query = """
+            SELECT i.*, c.category_name 
+            FROM InventoryItems i 
+            JOIN Categories c ON i.category_id = c.category_id 
+            WHERE i.product_id = ?
+        """;
+        
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setInt(1, id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return new Inventory(
+                        rs.getInt("product_id"),
+                        rs.getString("product_name"),
+                        rs.getString("category_name"),
+                        rs.getInt("quantity"),
+                        rs.getDouble("make_price"),
+                        rs.getDouble("sell_price")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                    "Failed to fetch inventory item: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+        return null;
     }
 
-    // Order methods
+    public boolean addInventoryItem(String name, String categoryName, double makePrice, 
+                                  double sellPrice, int quantity, String recipe) {
+        return addInventoryItem(name, categoryName, makePrice, sellPrice, quantity, recipe, 1); // Default to admin ID 1
+    }
+
+    public boolean addInventoryItem(String name, String categoryName, double makePrice, 
+                                  double sellPrice, int quantity, String recipe, int employeeId) {
+        int categoryId = getCategoryId(categoryName);
+        if (categoryId == -1) {
+            JOptionPane.showMessageDialog(null,
+                    "Invalid category: " + categoryName,
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        String query = """
+            INSERT INTO InventoryItems (
+                product_name, category_id, make_price, sell_price, quantity, 
+                status, recipe_instructions, last_restocked_by
+            ) VALUES (?, ?, ?, ?, ?, 'Available', ?, ?)
+        """;
+        
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setString(1, name);
+            stmt.setInt(2, categoryId);
+            stmt.setDouble(3, makePrice);
+            stmt.setDouble(4, sellPrice);
+            stmt.setInt(5, quantity);
+            stmt.setString(6, recipe);
+            stmt.setInt(7, employeeId);
+            
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                    "Failed to add inventory item: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
+    public boolean updateInventoryItem(int id, String name, String categoryName, 
+                                     double makePrice, double sellPrice, 
+                                     int quantity, String recipe) {
+        int categoryId = getCategoryId(categoryName);
+        if (categoryId == -1) {
+            JOptionPane.showMessageDialog(null,
+                    "Invalid category: " + categoryName,
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        String query = """
+            UPDATE InventoryItems 
+            SET product_name = ?, category_id = ?, make_price = ?, 
+                sell_price = ?, quantity = ?, recipe_instructions = ? 
+            WHERE product_id = ?
+        """;
+        
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setString(1, name);
+            stmt.setInt(2, categoryId);
+            stmt.setDouble(3, makePrice);
+            stmt.setDouble(4, sellPrice);
+            stmt.setInt(5, quantity);
+            stmt.setString(6, recipe);
+            stmt.setInt(7, id);
+            
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                    "Failed to update inventory item: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
+    public boolean deleteInventoryItem(int id) {
+        String query = "DELETE FROM InventoryItems WHERE product_id = ?";
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                    "Failed to delete inventory item: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
+    // Delegate to DAOs
     public List<Order> getAllOrders() {
         return orderDAO.getAllOrders();
     }
@@ -55,52 +280,13 @@ public class RestaurantController {
     }
 
     public boolean createOrder(Order order, List<OrderItem> items, List<Integer> employeeIds) {
-        int orderId = orderDAO.createOrder(order);
-        if (orderId == -1) return false;
-
-        order.setOrderId(orderId);
-        
-        // Add order items
-        for (OrderItem item : items) {
-            item.setOrderId(orderId);
-            if (!orderDAO.addOrderItem(item)) return false;
-        }
-
-        // Assign employees
-        for (int employeeId : employeeIds) {
-            if (!orderDAO.assignEmployeeToOrder(orderId, employeeId)) return false;
-        }
-
-        return true;
-    }
-
-    public double calculateOrderTotal(int orderId) {
-        List<OrderItem> items = orderDAO.getOrderItems(orderId);
-        double total = 0.0;
-        for (OrderItem item : items) {
-            Restaurant product = restaurantDAO.getRestaurantById(item.getProductId());
-            if (product != null) {
-                total += product.getRating() * item.getQuantity(); // Using rating as price for this example
-            }
-        }
-        return total;
-    }
-
-    public boolean processPayment(int orderId, double amount, String paymentMethod) {
-        // In a real application, this would integrate with a payment processing system
-        return orderDAO.updateOrderStatus(orderId, "Completed");
+        return orderDAO.createOrder(order, items, employeeIds);
     }
 
     public List<Order> getOrdersByDateRange(String startDate, String endDate) {
-        try {
-            return orderDAO.getOrdersByDateRange(startDate, endDate);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new ArrayList<>();
-        }
+        return orderDAO.getOrdersByDateRange(startDate, endDate);
     }
 
-    // Customer methods
     public List<Customer> getAllCustomers() {
         return customerDAO.getAllCustomers();
     }
@@ -117,17 +303,8 @@ public class RestaurantController {
         return customerDAO.updateCustomer(customer);
     }
 
-    public boolean deleteCustomer(int id) {
-        return customerDAO.deleteCustomer(id);
-    }
-
-    // Employee methods
-    public List<Employee> getAllEmployees() {
-        return employeeDAO.getAllEmployees();
-    }
-
-    public Employee getEmployeeById(int id) {
-        return employeeDAO.getEmployeeById(id);
+    public boolean deleteCustomer(int customerId) {
+        return customerDAO.deleteCustomer(customerId);
     }
 
     public boolean addEmployee(Employee employee) {
@@ -138,43 +315,358 @@ public class RestaurantController {
         return employeeDAO.updateEmployee(employee);
     }
 
-    public boolean deleteEmployee(int id) {
-        return employeeDAO.deleteEmployee(id);
+    public boolean deleteEmployee(int employeeId) {
+        return employeeDAO.deleteEmployee(employeeId);
     }
 
-    public boolean assignShift(int employeeId, String date, String shiftType) {
-        return employeeDAO.assignShift(employeeId, date, shiftType);
+    public Employee getEmployeeById(int employeeId) {
+        return employeeDAO.getEmployeeById(employeeId);
     }
 
-    public List<Employee> getEmployeesByShift(String date, String shiftType) {
-        return employeeDAO.getEmployeesByShift(date, shiftType);
+    public List<Employee> getAllEmployees() {
+        return employeeDAO.getAllEmployees();
+    }
+
+    public boolean assignShift(int employeeId, int timeShiftId) {
+        return employeeDAO.assignShift(employeeId, timeShiftId);
     }
 
     public boolean removeShift(int employeeId) {
         return employeeDAO.removeShift(employeeId);
     }
 
-    // Additional business logic methods
-    public double calculateAverageRating(List<Restaurant> restaurants) {
-        if (restaurants.isEmpty()) {
-            return 0.0;
+    public String getCurrentShift(int employeeId) {
+        return employeeDAO.getCurrentShift(employeeId);
+    }
+
+    public List<Supplier> getAllSuppliers() {
+        return supplierDAO.getAllSuppliers();
+    }
+
+    public Supplier getSupplierById(int id) {
+        return supplierDAO.getSupplierById(id);
+    }
+
+    public boolean addSupplier(Supplier supplier) {
+        return supplierDAO.addSupplier(supplier);
+    }
+
+    public boolean updateSupplier(Supplier supplier) {
+        return supplierDAO.updateSupplier(supplier);
+    }
+
+    public boolean deleteSupplier(int supplierId) {
+        return supplierDAO.deleteSupplier(supplierId);
+    }
+
+    public List<Inventory> getSupplierIngredients(int supplierId) {
+        return supplierDAO.getSupplierIngredients(supplierId);
+    }
+
+    // Customer Order Methods
+    public List<Order> getCustomerOrders(int customerId) {
+        return orderDAO.getOrdersByCustomerId(customerId);
+    }
+
+    public double calculateOrderTotal(int orderId) {
+        List<OrderItem> items = orderDAO.getOrderItems(orderId);
+        double total = 0.0;
+        for (OrderItem item : items) {
+            total += item.getQuantity() * item.getPriceAtTime();
         }
-        double sum = restaurants.stream()
-                .mapToDouble(Restaurant::getRating)
-                .sum();
-        return sum / restaurants.size();
+        return total;
     }
 
-    public List<Restaurant> getTopRatedRestaurants(int limit) {
-        return getAllRestaurants().stream()
-                .sorted((r1, r2) -> Double.compare(r2.getRating(), r1.getRating()))
-                .limit(limit)
-                .toList();
+    public boolean processPayment(int orderId, double amountReceived, String paymentMethod) {
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // Update order with payment information
+                String orderQuery = "UPDATE Orders SET order_status = 'Completed', payment_status = 'Paid', " +
+                                  "payment_method = ?, total_amount = ? WHERE order_id = ?";
+                try (PreparedStatement orderStmt = conn.prepareStatement(orderQuery)) {
+                    orderStmt.setString(1, paymentMethod);
+                    orderStmt.setDouble(2, amountReceived);
+                    orderStmt.setInt(3, orderId);
+                    orderStmt.executeUpdate();
+                }
+
+                conn.commit();
+                return true;
+            } catch (SQLException e) {
+                conn.rollback();
+                e.printStackTrace();
+                return false;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
-    public List<Restaurant> getRestaurantsByCuisine(String cuisine) {
-        return getAllRestaurants().stream()
-                .filter(r -> r.getCuisine().equalsIgnoreCase(cuisine))
-                .toList();
+    public void generateSalesReport(String datePattern, javax.swing.table.DefaultTableModel tableModel) {
+        String query = """
+            SELECT
+                DATE(o.order_datetime) AS sales_date,
+                SUM(oi.quantity * i.sell_price) AS total_sales,
+                AVG(oi.quantity * i.sell_price) AS average_sales,
+                i.product_name AS top_product,
+                SUM(oi.quantity) AS product_sold
+            FROM Orders o
+            JOIN OrderItems oi ON o.order_id = oi.order_id
+            JOIN InventoryItems i ON oi.product_id = i.product_id
+            WHERE DATE(o.order_datetime) LIKE ?
+            GROUP BY sales_date, i.product_name
+            ORDER BY sales_date, product_sold DESC
+        """;
+
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setString(1, datePattern);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getString("sales_date"),
+                    rs.getDouble("total_sales"),
+                    rs.getDouble("average_sales"),
+                    rs.getString("top_product"),
+                    rs.getInt("product_sold")
+                };
+                tableModel.addRow(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Error generating sales report: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public void generateCustomerOrdersReport(String datePattern, javax.swing.table.DefaultTableModel tableModel) {
+        String query = """
+            SELECT
+                COUNT(DISTINCT o.order_id) AS total_orders,
+                SUM(oi.quantity * i.sell_price) AS total_amount_spent,
+                i.product_name AS most_bought_product,
+                SUM(oi.quantity) AS most_bought_quantity
+            FROM Orders o
+            JOIN OrderItems oi ON o.order_id = oi.order_id
+            JOIN InventoryItems i ON oi.product_id = i.product_id
+            WHERE DATE(o.order_datetime) LIKE ?
+            GROUP BY i.product_name
+            ORDER BY most_bought_quantity DESC
+            LIMIT 1
+        """;
+
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setString(1, datePattern);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("total_orders"),
+                    rs.getDouble("total_amount_spent"),
+                    rs.getString("most_bought_product"),
+                    rs.getInt("most_bought_quantity")
+                };
+                tableModel.addRow(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Error generating customer orders report: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public void generateEmployeeShiftsReport(String datePattern, javax.swing.table.DefaultTableModel tableModel) {
+        String query = """
+            SELECT
+                e.employee_id,
+                e.first_name,
+                e.last_name,
+                COUNT(a.order_id) AS num_of_shifts,
+                SUM(
+                    TIMESTAMPDIFF(
+                        HOUR,
+                        ts.time_start,
+                        CASE
+                            WHEN ts.time_end < ts.time_start THEN ADDTIME(ts.time_end, '24:00:00')
+                            ELSE ts.time_end
+                        END
+                    )
+                ) AS total_hours_worked
+            FROM Employee e
+            JOIN AssignedEmployeesToOrders a ON e.employee_id = a.employee_id
+            JOIN Orders o ON a.order_id = o.order_id
+            JOIN TimeShifts ts ON e.time_shiftid = ts.time_shiftid
+            WHERE o.order_datetime LIKE ?
+            GROUP BY e.employee_id, e.first_name, e.last_name, ts.time_start, ts.time_end
+            ORDER BY total_hours_worked DESC
+        """;
+
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setString(1, datePattern);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("employee_id"),
+                    rs.getString("first_name"),
+                    rs.getString("last_name"),
+                    rs.getInt("num_of_shifts"),
+                    rs.getInt("total_hours_worked")
+                };
+                tableModel.addRow(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Error generating employee shifts report: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public void generateProfitMarginReport(String datePattern, javax.swing.table.DefaultTableModel tableModel) {
+        String query = """
+            SELECT
+                i.product_id,
+                o.order_id,
+                COUNT(*) AS total_orders_with_item,
+                SUM(oi.quantity) AS total_amount_ordered,
+                SUM(oi.quantity) * i.sell_price AS total_revenue,
+                SUM(oi.quantity) * i.make_price AS total_cost,
+                (SUM(oi.quantity) * i.sell_price) - (SUM(oi.quantity) * i.make_price) AS total_profit,
+                o.order_datetime
+            FROM InventoryItems i
+            JOIN OrderItems oi ON i.product_id = oi.product_id
+            JOIN Orders o ON o.order_id = oi.order_id
+            WHERE DATE(o.order_datetime) LIKE ?
+            GROUP BY i.product_id, o.order_id, o.order_datetime
+            ORDER BY total_profit DESC
+        """;
+
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setString(1, datePattern);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                Object[] row = {
+                    rs.getInt("product_id"),
+                    rs.getInt("order_id"),
+                    rs.getString("order_datetime"),
+                    rs.getInt("total_orders_with_item"),
+                    rs.getInt("total_amount_ordered"),
+                    rs.getDouble("total_revenue"),
+                    rs.getDouble("total_cost"),
+                    rs.getDouble("total_profit")
+                };
+                tableModel.addRow(row);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Error generating profit margin report: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public List<Inventory> getLowStockItems(int maxQuantity) {
+        List<Inventory> items = new ArrayList<>();
+        String query = """
+            SELECT i.*, c.category_name 
+            FROM InventoryItems i 
+            JOIN Categories c ON i.category_id = c.category_id 
+            WHERE i.quantity <= ? 
+            ORDER BY i.quantity ASC
+        """;
+        
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setInt(1, maxQuantity);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    items.add(new Inventory(
+                        rs.getInt("product_id"),
+                        rs.getString("product_name"),
+                        rs.getString("category_name"),
+                        rs.getInt("quantity"),
+                        rs.getDouble("make_price"),
+                        rs.getDouble("sell_price")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to fetch low stock items: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+        return items;
+    }
+
+    public boolean restockInventory(int productId, int newQuantity, int employeeId) {
+        // First check if the employee exists and is authorized
+        Employee employee = getEmployeeById(employeeId);
+        if (employee == null) {
+            JOptionPane.showMessageDialog(null,
+                "Invalid employee ID",
+                "Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        // Get current quantity to verify increase
+        Inventory item = getInventoryItemById(productId);
+        if (item == null) {
+            JOptionPane.showMessageDialog(null,
+                "Invalid product ID",
+                "Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        if (newQuantity <= item.getQuantity()) {
+            JOptionPane.showMessageDialog(null,
+                "New quantity must be greater than current quantity",
+                "Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        String query = """
+            UPDATE InventoryItems 
+            SET quantity = ?, 
+                last_restock = CURRENT_TIMESTAMP, 
+                last_restocked_by = ? 
+            WHERE product_id = ?
+        """;
+        
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setInt(1, newQuantity);
+            stmt.setInt(2, employeeId);
+            stmt.setInt(3, productId);
+            
+            boolean success = stmt.executeUpdate() > 0;
+            if (success) {
+                JOptionPane.showMessageDialog(null,
+                    String.format("Successfully updated %s stock from %d to %d",
+                        item.getProductName(), item.getQuantity(), newQuantity),
+                    "Success",
+                    JOptionPane.INFORMATION_MESSAGE);
+            }
+            return success;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to restock inventory: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
     }
 } 

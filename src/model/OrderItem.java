@@ -1,34 +1,27 @@
 package model;
 
 public class OrderItem {
-    private int orderItemId;
     private int orderId;
     private int productId;
     private int quantity;
-    private double price;
+    private double priceAtTime;
 
-    public OrderItem(int orderItemId, int orderId, int productId, int quantity) {
-        this.orderItemId = orderItemId;
-        this.orderId = orderId;
-        this.productId = productId;
-        this.quantity = quantity;
+    // No-args constructor
+    public OrderItem() {
+        this.orderId = 0;
+        this.productId = 0;
+        this.quantity = 0;
+        this.priceAtTime = 0.0;
     }
 
-    public OrderItem(int orderId, int productId, int quantity) {
+    public OrderItem(int orderId, int productId, int quantity, double priceAtTime) {
         this.orderId = orderId;
         this.productId = productId;
         this.quantity = quantity;
+        this.priceAtTime = priceAtTime;
     }
 
     // Getters and setters
-    public int getOrderItemId() {
-        return orderItemId;
-    }
-
-    public void setOrderItemId(int orderItemId) {
-        this.orderItemId = orderItemId;
-    }
-
     public int getOrderId() {
         return orderId;
     }
@@ -53,11 +46,15 @@ public class OrderItem {
         this.quantity = quantity;
     }
 
-    public double getPrice() {
-        return price;
+    public double getPriceAtTime() {
+        return priceAtTime;
     }
 
-    public void setPrice(double price) {
-        this.price = price;
+    public void setPriceAtTime(double priceAtTime) {
+        this.priceAtTime = priceAtTime;
+    }
+
+    public double getSubtotal() {
+        return quantity * priceAtTime;
     }
 } 

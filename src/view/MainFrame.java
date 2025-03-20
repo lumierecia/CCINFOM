@@ -2,15 +2,20 @@ package view;
 
 import javax.swing.*;
 import java.awt.*;
+import controller.RestaurantController;
 
 public class MainFrame extends JFrame {
     private JTabbedPane tabbedPane;
+    private RestaurantController controller;
 
     public MainFrame() {
         setTitle("Restaurant Management System");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(800, 600);
+        setSize(1024, 768);
         setLocationRelativeTo(null);
+
+        // Initialize controller
+        controller = new RestaurantController();
 
         // Initialize components
         initComponents();
@@ -24,9 +29,12 @@ public class MainFrame extends JFrame {
         tabbedPane = new JTabbedPane();
         
         // Add tabs
-        tabbedPane.addTab("Records Management", new RecordsPanel());
-        tabbedPane.addTab("Transactions", new TransactionsPanel());
-        tabbedPane.addTab("Reports", new ReportsPanel());
+        tabbedPane.addTab("Inventory", new RecordsPanel(controller));
+        tabbedPane.addTab("Orders", new TransactionsPanel(controller));
+        tabbedPane.addTab("Customers", new CustomerPanel(controller));
+        tabbedPane.addTab("Employees", new EmployeePanel(controller));
+        tabbedPane.addTab("Suppliers", new SupplierPanel(controller));
+        tabbedPane.addTab("Reports", new ReportsPanel(controller));
     }
 
     public static void main(String[] args) {

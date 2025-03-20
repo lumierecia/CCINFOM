@@ -10,18 +10,20 @@ import java.util.Map;
 import java.util.HashMap;
 
 public class OrderDAO {
-    private Connection connection;
     private IngredientDAO ingredientDAO;
 
     public OrderDAO() {
-        this.connection = DatabaseConnection.getConnection();
         this.ingredientDAO = new IngredientDAO();
+    }
+
+    private Connection getConnection() throws SQLException {
+        return DatabaseConnection.getConnection();
     }
 
     public List<Order> getAllOrders() {
         List<Order> orders = new ArrayList<>();
         String query = "SELECT * FROM Orders ORDER BY order_datetime DESC";
-        try (Statement stmt = connection.createStatement();
+        try (Statement stmt = getConnection().createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
                 Order order = new Order(
@@ -29,10 +31,12 @@ public class OrderDAO {
                     rs.getInt("customer_id"),
                     rs.getTimestamp("order_datetime"),
                     rs.getString("order_type"),
-                    rs.getString("order_status")
+                    rs.getString("order_status"),
+                    rs.getString("payment_status"),
+                    rs.getDouble("total_amount"),
+                    rs.getString("payment_method")
                 );
-                loadOrderItems(order);
-                loadAssignedEmployees(order);
+                order.setItems(getOrderItems(order.getOrderId()));
                 orders.add(order);
             }
         } catch (SQLException e) {
@@ -43,20 +47,23 @@ public class OrderDAO {
 
     public Order getOrderById(int orderId) {
         String query = "SELECT * FROM Orders WHERE order_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, orderId);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                Order order = new Order(
-                    rs.getInt("order_id"),
-                    rs.getInt("customer_id"),
-                    rs.getTimestamp("order_datetime"),
-                    rs.getString("order_type"),
-                    rs.getString("order_status")
-                );
-                loadOrderItems(order);
-                loadAssignedEmployees(order);
-                return order;
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    Order order = new Order(
+                        rs.getInt("order_id"),
+                        rs.getInt("customer_id"),
+                        rs.getTimestamp("order_datetime"),
+                        rs.getString("order_type"),
+                        rs.getString("order_status"),
+                        rs.getString("payment_status"),
+                        rs.getDouble("total_amount"),
+                        rs.getString("payment_method")
+                    );
+                    order.setItems(getOrderItems(order.getOrderId()));
+                    return order;
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -65,18 +72,19 @@ public class OrderDAO {
     }
 
     private void loadOrderItems(Order order) {
-        String query = "SELECT * FROM Order_Item WHERE order_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        String query = "SELECT * FROM OrderItems WHERE order_id = ?";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, order.getOrderId());
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                OrderItem item = new OrderItem(
-                    rs.getInt("order_item_id"),
-                    rs.getInt("order_id"),
-                    rs.getInt("product_id"),
-                    rs.getInt("quantity")
-                );
-                order.getOrderItems().add(item);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    OrderItem item = new OrderItem(
+                        rs.getInt("order_id"),
+                        rs.getInt("product_id"),
+                        rs.getInt("quantity"),
+                        rs.getDouble("price_at_time")
+                    );
+                    order.getItems().add(item);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -85,11 +93,12 @@ public class OrderDAO {
 
     private void loadAssignedEmployees(Order order) {
         String query = "SELECT employee_id FROM Assigned_Employee_to_Order WHERE order_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, order.getOrderId());
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                order.getAssignedEmployees().add(rs.getInt("employee_id"));
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    order.getAssignedEmployees().add(rs.getInt("employee_id"));
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -102,56 +111,67 @@ public class OrderDAO {
             return -1; // Not enough ingredients
         }
 
-        String query = "INSERT INTO Orders (customer_id, order_type, order_status) VALUES (?, ?, ?)";
+        Connection conn = null;
         try {
-            connection.setAutoCommit(false);
+            conn = getConnection();
+            conn.setAutoCommit(false);
             
-            try (PreparedStatement pstmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            String query = "INSERT INTO Orders (customer_id, order_datetime, order_type, order_status, payment_status) VALUES (?, ?, ?, ?, ?)";
+            try (PreparedStatement pstmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
                 pstmt.setInt(1, order.getCustomerId());
-                pstmt.setString(2, order.getOrderType());
-                pstmt.setString(3, "In Progress");
+                pstmt.setTimestamp(2, order.getOrderDateTime());
+                pstmt.setString(3, order.getOrderType());
+                pstmt.setString(4, order.getOrderStatus());
+                pstmt.setString(5, order.getPaymentStatus());
                 
                 pstmt.executeUpdate();
                 
-                ResultSet rs = pstmt.getGeneratedKeys();
-                if (rs.next()) {
-                    int orderId = rs.getInt(1);
-                    order.setOrderId(orderId);
-                    
-                    // Add order items
-                    if (!addOrderItems(order)) {
-                        connection.rollback();
-                        return -1;
+                try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        int orderId = rs.getInt(1);
+                        order.setOrderId(orderId);
+                        
+                        // Add order items
+                        if (!addOrderItems(order)) {
+                            conn.rollback();
+                            return -1;
+                        }
+                        
+                        // Assign employees
+                        if (!assignEmployeesToOrder(order)) {
+                            conn.rollback();
+                            return -1;
+                        }
+                        
+                        // Deduct ingredients
+                        if (!deductIngredients(order)) {
+                            conn.rollback();
+                            return -1;
+                        }
+                        
+                        conn.commit();
+                        return orderId;
                     }
-                    
-                    // Assign employees
-                    if (!assignEmployeesToOrder(order)) {
-                        connection.rollback();
-                        return -1;
-                    }
-                    
-                    // Deduct ingredients
-                    if (!deductIngredients(order)) {
-                        connection.rollback();
-                        return -1;
-                    }
-                    
-                    connection.commit();
-                    return orderId;
                 }
             }
+            conn.rollback();
+            return -1;
         } catch (SQLException e) {
-            try {
-                connection.rollback();
-            } catch (SQLException rollbackEx) {
-                rollbackEx.printStackTrace();
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException rollbackEx) {
+                    rollbackEx.printStackTrace();
+                }
             }
             e.printStackTrace();
         } finally {
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException e) {
-                e.printStackTrace();
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
             }
         }
         return -1;
@@ -161,7 +181,7 @@ public class OrderDAO {
         Map<Integer, Double> requiredIngredients = new HashMap<>();
         
         // Calculate total required ingredients
-        for (OrderItem item : order.getOrderItems()) {
+        for (OrderItem item : order.getItems()) {
             Map<Integer, Double> itemIngredients = getRequiredIngredientsForItem(item);
             for (Map.Entry<Integer, Double> entry : itemIngredients.entrySet()) {
                 requiredIngredients.merge(entry.getKey(), entry.getValue(), Double::sum);
@@ -170,14 +190,15 @@ public class OrderDAO {
         
         // Check if we have enough of each ingredient
         String query = "SELECT ingredient_id, quantity_in_stock FROM Ingredients WHERE ingredient_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             for (Map.Entry<Integer, Double> entry : requiredIngredients.entrySet()) {
                 pstmt.setInt(1, entry.getKey());
-                ResultSet rs = pstmt.executeQuery();
-                if (rs.next()) {
-                    double stock = rs.getDouble("quantity_in_stock");
-                    if (stock < entry.getValue()) {
-                        return false;
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        double stock = rs.getDouble("quantity_in_stock");
+                        if (stock < entry.getValue()) {
+                            return false;
+                        }
                     }
                 }
             }
@@ -196,16 +217,17 @@ public class OrderDAO {
             WHERE di.product_id = ?
         """;
         
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, item.getQuantity());
             pstmt.setInt(2, item.getProductId());
             
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                ingredients.put(
-                    rs.getInt("ingredient_id"),
-                    rs.getDouble("required_quantity")
-                );
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    ingredients.put(
+                        rs.getInt("ingredient_id"),
+                        rs.getDouble("required_quantity")
+                    );
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -217,7 +239,7 @@ public class OrderDAO {
         Map<Integer, Double> requiredIngredients = new HashMap<>();
         
         // Calculate total required ingredients
-        for (OrderItem item : order.getOrderItems()) {
+        for (OrderItem item : order.getItems()) {
             Map<Integer, Double> itemIngredients = getRequiredIngredientsForItem(item);
             for (Map.Entry<Integer, Double> entry : itemIngredients.entrySet()) {
                 requiredIngredients.merge(entry.getKey(), entry.getValue(), Double::sum);
@@ -241,16 +263,17 @@ public class OrderDAO {
     }
 
     private boolean addOrderItems(Order order) {
-        String query = "INSERT INTO Order_Item (order_id, product_id, quantity) VALUES (?, ?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            for (OrderItem item : order.getOrderItems()) {
+        String query = "INSERT INTO OrderItems (order_id, product_id, quantity, price_at_time) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
+            for (OrderItem item : order.getItems()) {
                 pstmt.setInt(1, order.getOrderId());
                 pstmt.setInt(2, item.getProductId());
                 pstmt.setInt(3, item.getQuantity());
+                pstmt.setDouble(4, item.getPriceAtTime());
                 pstmt.addBatch();
             }
             int[] results = pstmt.executeBatch();
-            return results.length == order.getOrderItems().size();
+            return results.length == order.getItems().size();
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -259,7 +282,7 @@ public class OrderDAO {
 
     private boolean assignEmployeesToOrder(Order order) {
         String query = "INSERT INTO Assigned_Employee_to_Order (order_id, employee_id) VALUES (?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             for (Integer employeeId : order.getAssignedEmployees()) {
                 pstmt.setInt(1, order.getOrderId());
                 pstmt.setInt(2, employeeId);
@@ -275,7 +298,7 @@ public class OrderDAO {
 
     public boolean updateOrderStatus(int orderId, String status) {
         String query = "UPDATE Orders SET order_status = ? WHERE order_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setString(1, status);
             pstmt.setInt(2, orderId);
             return pstmt.executeUpdate() > 0;
@@ -287,30 +310,182 @@ public class OrderDAO {
 
     public List<Order> getOrdersByDateRange(String startDate, String endDate) {
         List<Order> orders = new ArrayList<>();
-        String sql = "SELECT * FROM Orders WHERE DATE(order_datetime) BETWEEN ? AND ? ORDER BY order_datetime";
-        
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setString(1, startDate);
-            stmt.setString(2, endDate);
-            
-            try (ResultSet rs = stmt.executeQuery()) {
+        String query = "SELECT * FROM Orders WHERE DATE(order_datetime) BETWEEN ? AND ? ORDER BY order_datetime DESC";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     Order order = new Order(
                         rs.getInt("order_id"),
                         rs.getInt("customer_id"),
                         rs.getTimestamp("order_datetime"),
                         rs.getString("order_type"),
-                        rs.getString("order_status")
+                        rs.getString("order_status"),
+                        rs.getString("payment_status"),
+                        rs.getDouble("total_amount"),
+                        rs.getString("payment_method")
                     );
-                    loadOrderItems(order);
-                    loadAssignedEmployees(order);
+                    order.setItems(getOrderItems(order.getOrderId()));
                     orders.add(order);
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        
         return orders;
+    }
+
+    public boolean addOrderItem(OrderItem item) {
+        String query = "INSERT INTO OrderItems (order_id, product_id, quantity, price_at_time) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
+            pstmt.setInt(1, item.getOrderId());
+            pstmt.setInt(2, item.getProductId());
+            pstmt.setInt(3, item.getQuantity());
+            pstmt.setDouble(4, item.getPriceAtTime());
+            
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean assignEmployeeToOrder(int orderId, int employeeId) {
+        String query = "INSERT INTO Assigned_Employee_to_Order (order_id, employee_id) VALUES (?, ?)";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
+            pstmt.setInt(1, orderId);
+            pstmt.setInt(2, employeeId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public List<OrderItem> getOrderItems(int orderId) {
+        List<OrderItem> items = new ArrayList<>();
+        String query = "SELECT * FROM OrderItems WHERE order_id = ?";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
+            pstmt.setInt(1, orderId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    OrderItem item = new OrderItem(
+                        rs.getInt("order_id"),
+                        rs.getInt("product_id"),
+                        rs.getInt("quantity"),
+                        rs.getDouble("price_at_time")
+                    );
+                    items.add(item);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return items;
+    }
+
+    public boolean createOrder(Order order, List<OrderItem> items, List<Integer> employeeIds) {
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            conn.setAutoCommit(false);
+
+            // Insert order
+            String orderQuery = "INSERT INTO Orders (customer_id, order_type, order_status, payment_status) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement orderStmt = conn.prepareStatement(orderQuery, Statement.RETURN_GENERATED_KEYS)) {
+                orderStmt.setInt(1, order.getCustomerId());
+                orderStmt.setString(2, order.getOrderType());
+                orderStmt.setString(3, order.getOrderStatus());
+                orderStmt.setString(4, order.getPaymentStatus());
+                
+                if (orderStmt.executeUpdate() > 0) {
+                    try (ResultSet rs = orderStmt.getGeneratedKeys()) {
+                        if (rs.next()) {
+                            order.setOrderId(rs.getInt(1));
+                        }
+                    }
+                }
+            }
+
+            // Insert order items
+            String itemQuery = "INSERT INTO OrderItems (order_id, product_id, quantity, price_at_time) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement itemStmt = conn.prepareStatement(itemQuery)) {
+                for (OrderItem item : items) {
+                    itemStmt.setInt(1, order.getOrderId());
+                    itemStmt.setInt(2, item.getProductId());
+                    itemStmt.setInt(3, item.getQuantity());
+                    itemStmt.setDouble(4, item.getPriceAtTime());
+                    itemStmt.executeUpdate();
+                }
+            }
+
+            // Assign employees to order
+            String assignQuery = "INSERT INTO AssignedEmployeesToOrders (order_id, employee_id) VALUES (?, ?)";
+            try (PreparedStatement assignStmt = conn.prepareStatement(assignQuery)) {
+                for (Integer employeeId : employeeIds) {
+                    assignStmt.setInt(1, order.getOrderId());
+                    assignStmt.setInt(2, employeeId);
+                    assignStmt.executeUpdate();
+                }
+            }
+
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException rollbackEx) {
+                    rollbackEx.printStackTrace();
+                }
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    public List<Order> getOrdersByCustomerId(int customerId) {
+        List<Order> orders = new ArrayList<>();
+        String query = "SELECT * FROM Orders WHERE customer_id = ? ORDER BY order_datetime DESC";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
+            pstmt.setInt(1, customerId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Order order = new Order(
+                        rs.getInt("order_id"),
+                        rs.getInt("customer_id"),
+                        rs.getTimestamp("order_datetime"),
+                        rs.getString("order_type"),
+                        rs.getString("order_status"),
+                        rs.getString("payment_status"),
+                        rs.getDouble("total_amount"),
+                        rs.getString("payment_method")
+                    );
+                    order.setItems(getOrderItems(order.getOrderId()));
+                    orders.add(order);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return orders;
+    }
+
+    public double calculateOrderTotal(int orderId) {
+        List<OrderItem> items = getOrderItems(orderId);
+        double total = 0.0;
+        for (OrderItem item : items) {
+            total += item.getQuantity() * item.getPriceAtTime();
+        }
+        return total;
     }
 } 

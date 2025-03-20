@@ -1,244 +1,208 @@
 package view;
 
 import controller.RestaurantController;
-import model.*;
+import model.Order;
+import model.OrderItem;
+import model.Customer;
+import model.Employee;
+import model.Inventory;
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 
 public class ReportsPanel extends JPanel {
-    private JComboBox<String> reportTypeComboBox;
-    private JButton generateButton;
-    private JTextArea reportArea;
-    private JPanel chartPanel;
-    private RestaurantController controller;
-    private JTextField startDateField;
-    private JTextField endDateField;
+    private final RestaurantController controller;
+    private final JComboBox<String> reportTypeCombo;
+    private final JTable reportTable;
+    private DefaultTableModel tableModel;
+    private final JPanel reportPanel;
+    private final JTextField dayField;
+    private final JTextField monthField;
+    private final JTextField yearField;
+    private final JLabel summaryLabel;
 
-    public ReportsPanel() {
-        controller = new RestaurantController();
+    public ReportsPanel(RestaurantController controller) {
+        this.controller = controller;
         setLayout(new BorderLayout());
-        initComponents();
-    }
 
-    private void initComponents() {
-        // Create controls panel
-        JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        reportTypeComboBox = new JComboBox<>(new String[]{
-            "Daily Revenue",
-            "Monthly Revenue",
-            "Popular Dishes",
-            "Customer Feedback",
-            "Inventory Status",
-            "Employee Shifts"
-        });
-        generateButton = new JButton("Generate Report");
-        startDateField = new JTextField(10);
-        endDateField = new JTextField(10);
+        // Create control panel
+        JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         
-        controlsPanel.add(new JLabel("Report Type: "));
-        controlsPanel.add(reportTypeComboBox);
-        controlsPanel.add(new JLabel("Start Date (YYYY-MM-DD): "));
-        controlsPanel.add(startDateField);
-        controlsPanel.add(new JLabel("End Date (YYYY-MM-DD): "));
-        controlsPanel.add(endDateField);
-        controlsPanel.add(generateButton);
+        // Report type selector
+        String[] reportTypes = {
+            "Sales Report",
+            "Customer Orders Report",
+            "Employee Shifts Report",
+            "Profit Margin Report"
+        };
+        reportTypeCombo = new JComboBox<>(reportTypes);
+        
+        // Date input fields
+        dayField = new JTextField(2);
+        monthField = new JTextField(2);
+        yearField = new JTextField(4);
+        
+        JButton generateButton = new JButton("Generate Report");
+        
+        controlPanel.add(new JLabel("Report Type:"));
+        controlPanel.add(reportTypeCombo);
+        controlPanel.add(new JLabel("Day (0 to skip):"));
+        controlPanel.add(dayField);
+        controlPanel.add(new JLabel("Month (0 to skip):"));
+        controlPanel.add(monthField);
+        controlPanel.add(new JLabel("Year (0 to skip):"));
+        controlPanel.add(yearField);
+        controlPanel.add(generateButton);
 
-        // Create split pane for report and chart
-        chartPanel = new JPanel();
-        chartPanel.setBackground(Color.WHITE);
-        chartPanel.setBorder(BorderFactory.createTitledBorder("Chart View"));
-
-        reportArea = new JTextArea();
-        reportArea.setEditable(false);
-        reportArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        JScrollPane scrollPane = new JScrollPane(reportArea);
-        scrollPane.setBorder(BorderFactory.createTitledBorder("Report Details"));
-
-        JSplitPane splitPane = new JSplitPane(
-            JSplitPane.HORIZONTAL_SPLIT,
-            chartPanel,
-            scrollPane
-        );
-        splitPane.setResizeWeight(0.5);
-
-        // Add components to panel
-        add(controlsPanel, BorderLayout.NORTH);
-        add(splitPane, BorderLayout.CENTER);
+        // Create report panel
+        reportPanel = new JPanel(new BorderLayout());
+        
+        // Create table
+        reportTable = new JTable();
+        reportTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+        
+        // Create summary label
+        summaryLabel = new JLabel();
+        summaryLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        
+        // Add components to main panel
+        add(controlPanel, BorderLayout.NORTH);
+        add(reportPanel, BorderLayout.CENTER);
+        add(summaryLabel, BorderLayout.SOUTH);
 
         // Add listeners
         generateButton.addActionListener(e -> generateReport());
-        reportTypeComboBox.addActionListener(e -> updateChartPanel());
+        reportTypeCombo.addActionListener(e -> updateReportPanel());
+
+        // Set default values
+        dayField.setText("0");
+        monthField.setText("0");
+        yearField.setText("0");
+
+        // Initialize the report panel
+        updateReportPanel();
+    }
+
+    private void updateReportPanel() {
+        reportPanel.removeAll();
+        String selectedReport = (String) reportTypeCombo.getSelectedItem();
+        
+        switch (selectedReport) {
+            case "Sales Report" -> setupSalesReport();
+            case "Customer Orders Report" -> setupCustomerOrdersReport();
+            case "Employee Shifts Report" -> setupEmployeeShiftsReport();
+            case "Profit Margin Report" -> setupProfitMarginReport();
+        }
+        
+        reportPanel.revalidate();
+        reportPanel.repaint();
+    }
+
+    private String getDatePattern() {
+        try {
+            int day = Integer.parseInt(dayField.getText().trim());
+            int month = Integer.parseInt(monthField.getText().trim());
+            int year = Integer.parseInt(yearField.getText().trim());
+
+            if (day < 0 || month < 0 || year < 0) {
+                throw new IllegalArgumentException("Values must be non-negative");
+            }
+
+            if (month > 12) {
+                throw new IllegalArgumentException("Month must be between 0 and 12");
+            }
+
+            if (day > 31) {
+                throw new IllegalArgumentException("Day must be between 0 and 31");
+            }
+
+            String yearStr = (year == 0) ? "%" : String.format("%04d", year);
+            String monthStr = (month == 0) ? "%" : String.format("%02d", month);
+            String dayStr = (day == 0) ? "%" : String.format("%02d", day);
+
+            return String.format("%s-%s-%s", yearStr, monthStr, dayStr);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Please enter valid numbers");
+        }
+    }
+
+    private void setupSalesReport() {
+        String[] columns = {"Sales Date", "Total Sales", "Average Sales", "Top Product", "Units Sold"};
+        tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        reportTable.setModel(tableModel);
+        reportPanel.add(new JScrollPane(reportTable), BorderLayout.CENTER);
+    }
+
+    private void setupCustomerOrdersReport() {
+        String[] columns = {"Total Orders", "Total Amount Spent", "Most Bought Product", "Most Bought Quantity"};
+        tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        reportTable.setModel(tableModel);
+        reportPanel.add(new JScrollPane(reportTable), BorderLayout.CENTER);
+    }
+
+    private void setupEmployeeShiftsReport() {
+        String[] columns = {"Employee ID", "First Name", "Last Name", "Total Shifts", "Total Hours"};
+        tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        reportTable.setModel(tableModel);
+        reportPanel.add(new JScrollPane(reportTable), BorderLayout.CENTER);
+    }
+
+    private void setupProfitMarginReport() {
+        String[] columns = {"Product ID", "Order ID", "Order Date", "Total Orders", "Total Quantity", "Revenue", "Cost", "Profit"};
+        tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        reportTable.setModel(tableModel);
+        reportPanel.add(new JScrollPane(reportTable), BorderLayout.CENTER);
     }
 
     private void generateReport() {
-        String reportType = (String) reportTypeComboBox.getSelectedItem();
-        String startDate = startDateField.getText();
-        String endDate = endDateField.getText();
-
-        if (startDate.isEmpty() || endDate.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please enter both start and end dates.");
-            return;
-        }
-
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            Date start = sdf.parse(startDate);
-            Date end = sdf.parse(endDate);
-
-            if (start.after(end)) {
-                JOptionPane.showMessageDialog(this, "Start date must be before end date.");
-                return;
+            String datePattern = getDatePattern();
+            String selectedReport = (String) reportTypeCombo.getSelectedItem();
+            
+            tableModel.setRowCount(0);
+            
+            switch (selectedReport) {
+                case "Sales Report" -> controller.generateSalesReport(datePattern, tableModel);
+                case "Customer Orders Report" -> controller.generateCustomerOrdersReport(datePattern, tableModel);
+                case "Employee Shifts Report" -> controller.generateEmployeeShiftsReport(datePattern, tableModel);
+                case "Profit Margin Report" -> controller.generateProfitMarginReport(datePattern, tableModel);
             }
-
-            StringBuilder report = new StringBuilder();
-            report.append("Report Type: ").append(reportType).append("\n");
-            report.append("Period: ").append(startDate).append(" to ").append(endDate).append("\n\n");
-
-            switch (reportType) {
-                case "Daily Revenue" -> generateDailyRevenueReport(report, startDate, endDate);
-                case "Monthly Revenue" -> generateMonthlyRevenueReport(report, startDate, endDate);
-                case "Popular Dishes" -> generatePopularDishesReport(report, startDate, endDate);
-                case "Customer Feedback" -> generateCustomerFeedbackReport(report, startDate, endDate);
-                case "Inventory Status" -> generateInventoryStatusReport(report);
-                case "Employee Shifts" -> generateEmployeeShiftsReport(report, startDate, endDate);
-            }
-
-            reportArea.setText(report.toString());
-            updateChartPanel();
-
+        } catch (IllegalArgumentException e) {
+            JOptionPane.showMessageDialog(this, 
+                e.getMessage(), 
+                "Input Error", 
+                JOptionPane.ERROR_MESSAGE);
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Invalid date format. Please use YYYY-MM-DD format.");
+            JOptionPane.showMessageDialog(this, 
+                "Error generating report: " + e.getMessage(), 
+                "Error", 
+                JOptionPane.ERROR_MESSAGE);
         }
-    }
-
-    private void generateDailyRevenueReport(StringBuilder report, String startDate, String endDate) {
-        report.append("Daily Revenue Report\n");
-        report.append("===================\n\n");
-        
-        List<Order> orders = controller.getOrdersByDateRange(startDate, endDate);
-        double totalRevenue = 0.0;
-        
-        for (Order order : orders) {
-            double orderTotal = controller.calculateOrderTotal(order.getOrderId());
-            totalRevenue += orderTotal;
-            report.append(String.format("Order #%d: $%.2f\n", order.getOrderId(), orderTotal));
-        }
-        
-        report.append("\nTotal Revenue: $").append(String.format("%.2f", totalRevenue));
-    }
-
-    private void generateMonthlyRevenueReport(StringBuilder report, String startDate, String endDate) {
-        report.append("Monthly Revenue Report\n");
-        report.append("=====================\n\n");
-        
-        // Group orders by month and calculate totals
-        // This would typically involve SQL aggregation in a real application
-    }
-
-    private void generatePopularDishesReport(StringBuilder report, String startDate, String endDate) {
-        report.append("Popular Dishes Report\n");
-        report.append("====================\n\n");
-        
-        List<Restaurant> topDishes = controller.getTopRatedRestaurants(10);
-        for (Restaurant dish : topDishes) {
-            report.append(String.format("%s - Rating: %.1f\n", 
-                dish.getName(), dish.getRating()));
-        }
-    }
-
-    private void generateCustomerFeedbackReport(StringBuilder report, String startDate, String endDate) {
-        report.append("Customer Feedback Report\n");
-        report.append("=======================\n\n");
-        
-        // This would typically involve a feedback/ratings table in the database
-    }
-
-    private void generateInventoryStatusReport(StringBuilder report) {
-        report.append("Inventory Status Report\n");
-        report.append("=====================\n\n");
-        
-        List<Restaurant> inventory = controller.getAllRestaurants();
-        for (Restaurant item : inventory) {
-            report.append(String.format("%-30s | Rating: %.1f\n",
-                item.getName(), item.getRating()));
-        }
-    }
-
-    private void generateEmployeeShiftsReport(StringBuilder report, String startDate, String endDate) {
-        report.append("Employee Shifts Report\n");
-        report.append("=====================\n\n");
-        
-        List<Employee> employees = controller.getAllEmployees();
-        for (Employee employee : employees) {
-            report.append(String.format("%s %s - %s\n",
-                employee.getFirstName(),
-                employee.getLastName(),
-                employee.getPosition()));
-        }
-    }
-
-    private void updateChartPanel() {
-        chartPanel.removeAll();
-        String reportType = (String) reportTypeComboBox.getSelectedItem();
-        
-        // Create a panel to show chart information
-        JPanel infoPanel = new JPanel(new BorderLayout());
-        
-        // Add chart title
-        JLabel titleLabel = new JLabel("Visual Report: " + reportType);
-        titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
-        infoPanel.add(titleLabel, BorderLayout.NORTH);
-        
-        // Add chart description
-        String description = switch (reportType) {
-            case "Daily Revenue" -> 
-                "Bar chart showing revenue trends over the selected period, with daily totals and average lines.";
-            case "Monthly Revenue" -> 
-                "Line chart comparing monthly revenue trends, with year-over-year comparison capability.";
-            case "Popular Dishes" -> 
-                "Pie chart showing the distribution of most ordered dishes and their contribution to revenue.";
-            case "Customer Feedback" -> 
-                "Scatter plot showing customer ratings and feedback trends over time.";
-            case "Inventory Status" -> 
-                "Stacked bar chart showing current stock levels and reorder points for each item.";
-            case "Employee Shifts" -> 
-                "Gantt chart showing employee shift schedules and coverage analysis.";
-            default -> 
-                "Select a report type to view its corresponding chart visualization.";
-        };
-        
-        JTextArea descLabel = new JTextArea(description);
-        descLabel.setWrapStyleWord(true);
-        descLabel.setLineWrap(true);
-        descLabel.setOpaque(false);
-        descLabel.setEditable(false);
-        descLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        descLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        infoPanel.add(descLabel, BorderLayout.CENTER);
-        
-        // Add placeholder for actual chart
-        JPanel chartPlaceholder = new JPanel(new BorderLayout());
-        chartPlaceholder.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        chartPlaceholder.setPreferredSize(new Dimension(400, 300));
-        
-        JLabel placeholderLabel = new JLabel("Chart Visualization Area");
-        placeholderLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        chartPlaceholder.add(placeholderLabel, BorderLayout.CENTER);
-        
-        infoPanel.add(chartPlaceholder, BorderLayout.SOUTH);
-        
-        // Add note about future implementation
-        JLabel noteLabel = new JLabel("Note: Charts will be implemented using JFreeChart library");
-        noteLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        noteLabel.setFont(new Font("Arial", Font.ITALIC, 10));
-        infoPanel.add(noteLabel, BorderLayout.SOUTH);
-        
-        chartPanel.add(infoPanel);
-        chartPanel.revalidate();
-        chartPanel.repaint();
     }
 } 
