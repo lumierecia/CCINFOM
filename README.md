@@ -24,7 +24,8 @@ src/
 │   ├── OrderItem.java              # Order item entity
 │   └── Supplier.java               # Supplier entity
 ├── util/
-│   └── DatabaseConnection.java     # Database connection utility
+│   ├── DatabaseConnection.java     # Database connection utility
+│   └── DatabaseErrorHandler.java   # Error handling utility
 └── view/
     ├── MainFrame.java              # Main application window
     ├── CustomerPanel.java          # Customer management interface
@@ -33,6 +34,10 @@ src/
     ├── OrderPanel.java             # Order management interface
     ├── RecordsPanel.java           # Records and reporting interface
     └── SupplierPanel.java          # Supplier management interface
+
+sql/
+├── Group8_DB.sql                   # Database schema and sample data
+└── infomdbreal.eerd                # Entity Relationship Diagram
 ```
 
 ## Features
@@ -45,6 +50,7 @@ src/
 - Delete items
 - Track item status (Available/Unavailable)
 - Monitor low stock items
+- Automatic status updates based on quantity
 
 ### Order Management
 - Create new orders
@@ -77,24 +83,47 @@ src/
 - Employee shift reports
 - Profit margin analysis
 
-## Database Schema
+## Database Design
 
-The system uses MySQL with the following main tables:
+The system uses MySQL with a well-structured database design. The Entity Relationship Diagram (ERD) can be found in `sql/infomdbreal.mwb`.
+
+### Main Tables
 - `InventoryItems`: Stores product information
+  - Tracks quantity, prices, and status
+  - Links to categories and employees
+  - Includes recipe instructions
 - `Orders`: Tracks customer orders
+  - Supports multiple order types (Dine-In, Takeout, Delivery)
+  - Tracks payment status and method
+  - Links to customers and employees
 - `Customers`: Stores customer information
+  - Tracks contact details and order history
 - `Employees`: Manages employee data
+  - Assigns roles and shifts
+  - Tracks performance and assignments
 - `Suppliers`: Tracks supplier information
+  - Manages supplier relationships
+  - Tracks contact details and status
 - `Categories`: Product categories
+  - Organizes inventory items
 - `Ingredients`: Raw materials
+  - Tracks stock levels and costs
 - `OrderItems`: Order line items
+  - Links orders to products
+  - Records quantities and prices
+
+### Constraints and Validations
+- Check constraints for prices and quantities
+- Foreign key relationships for data integrity
+- ENUM types for status fields
+- Unique constraints where appropriate
 
 ## Getting Started
 
 1. Ensure you have Java 17 or later installed
 2. Set up MySQL database
 3. Run the `Group8_DB.sql` script to create the database schema
-4. Update database connection details in `DatabaseConnection.java`
+4. Update database connection details in `DatabaseConnection.java` (change the password!!)
 5. Compile and run the application:
    ```bash
    javac src/view/MainFrame.java
@@ -103,8 +132,11 @@ The system uses MySQL with the following main tables:
 
 ## Error Handling
 
-The system includes comprehensive error handling for:
+The system includes comprehensive error handling through `DatabaseErrorHandler.java`:
 - Database constraints
 - Invalid input validation
 - Business logic violations
 - Connection issues
+- User-friendly error messages
+- Proper exception propagation
+
