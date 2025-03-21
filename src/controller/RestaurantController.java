@@ -5,6 +5,7 @@ import dao.CustomerDAO;
 import dao.EmployeeDAO;
 import dao.IngredientDAO;
 import dao.SupplierDAO;
+import dao.InventoryDAO;
 import model.Order;
 import model.Customer;
 import model.Employee;
@@ -18,18 +19,26 @@ import java.util.List;
 import javax.swing.JOptionPane;
 
 public class RestaurantController {
-    private OrderDAO orderDAO;
-    private CustomerDAO customerDAO;
-    private EmployeeDAO employeeDAO;
-    private IngredientDAO ingredientDAO;
+    private final Connection connection;
+    private final CustomerDAO customerDAO;
+    private final OrderDAO orderDAO;
+    private final InventoryDAO inventoryDAO;
+    private final EmployeeDAO employeeDAO;
+    private final IngredientDAO ingredientDAO;
     private SupplierDAO supplierDAO;
 
     public RestaurantController() {
-        this.orderDAO = new OrderDAO();
-        this.customerDAO = new CustomerDAO();
-        this.employeeDAO = new EmployeeDAO();
-        this.ingredientDAO = new IngredientDAO();
-        this.supplierDAO = new SupplierDAO();
+        try {
+            this.connection = DatabaseConnection.getConnection();
+            this.customerDAO = new CustomerDAO();
+            this.orderDAO = new OrderDAO();
+            this.inventoryDAO = new InventoryDAO();
+            this.employeeDAO = new EmployeeDAO();
+            this.ingredientDAO = new IngredientDAO();
+            this.supplierDAO = new SupplierDAO();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to initialize database connection", e);
+        }
     }
 
     private Connection getConnection() throws SQLException {
@@ -79,7 +88,11 @@ public class RestaurantController {
     public List<Inventory> getAllInventoryItems() {
         List<Inventory> items = new ArrayList<>();
         String query = """
-            SELECT i.*, c.category_name 
+            SELECT i.*, c.category_name,
+                   CASE 
+                       WHEN i.quantity = 0 THEN 'Unavailable'
+                       ELSE 'Available'
+                   END as status
             FROM InventoryItems i 
             JOIN Categories c ON i.category_id = c.category_id 
             ORDER BY i.product_name
@@ -94,7 +107,8 @@ public class RestaurantController {
                     rs.getString("category_name"),
                     rs.getInt("quantity"),
                     rs.getDouble("make_price"),
-                    rs.getDouble("sell_price")
+                    rs.getDouble("sell_price"),
+                    rs.getString("status")
                 ));
             }
         } catch (SQLException e) {
@@ -110,7 +124,11 @@ public class RestaurantController {
     public List<Inventory> getInventoryItemsByCategory(String categoryName) {
         List<Inventory> items = new ArrayList<>();
         String query = """
-            SELECT i.*, c.category_name 
+            SELECT i.*, c.category_name,
+                   CASE 
+                       WHEN i.quantity = 0 THEN 'Unavailable'
+                       ELSE 'Available'
+                   END as status
             FROM InventoryItems i 
             JOIN Categories c ON i.category_id = c.category_id 
             WHERE c.category_name = ? 
@@ -127,7 +145,8 @@ public class RestaurantController {
                         rs.getString("category_name"),
                         rs.getInt("quantity"),
                         rs.getDouble("make_price"),
-                        rs.getDouble("sell_price")
+                        rs.getDouble("sell_price"),
+                        rs.getString("status")
                     ));
                 }
             }
@@ -228,10 +247,55 @@ public class RestaurantController {
             return false;
         }
 
+        // Validate input values
+        if (name == null || name.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(null,
+                    "Product name cannot be empty.",
+                    "Invalid Input",
+                    JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        if (makePrice <= 0) {
+            JOptionPane.showMessageDialog(null,
+                    "Make price must be greater than 0.",
+                    "Invalid Input",
+                    JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        if (sellPrice <= 0) {
+            JOptionPane.showMessageDialog(null,
+                    "Sell price must be greater than 0.",
+                    "Invalid Input",
+                    JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        if (sellPrice <= makePrice) {
+            JOptionPane.showMessageDialog(null,
+                    "Sell price must be greater than make price.",
+                    "Invalid Input",
+                    JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
+        if (quantity < 0) {
+            JOptionPane.showMessageDialog(null,
+                    "Quantity cannot be negative.",
+                    "Invalid Input",
+                    JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+
         String query = """
             UPDATE InventoryItems 
             SET product_name = ?, category_id = ?, make_price = ?, 
-                sell_price = ?, quantity = ?, recipe_instructions = ? 
+                sell_price = ?, quantity = ?, recipe_instructions = ?,
+                status = CASE 
+                    WHEN ? = 0 THEN 'Unavailable'
+                    ELSE 'Available'
+                END
             WHERE product_id = ?
         """;
         
@@ -242,13 +306,22 @@ public class RestaurantController {
             stmt.setDouble(4, sellPrice);
             stmt.setInt(5, quantity);
             stmt.setString(6, recipe);
-            stmt.setInt(7, id);
+            stmt.setInt(7, quantity);
+            stmt.setInt(8, id);
             
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            e.printStackTrace();
+            String errorMessage = "Failed to update inventory item: ";
+            if (e.getMessage().contains("inventoryitems_chk_3")) {
+                errorMessage += "Invalid price values. Make price and sell price must be greater than 0.";
+            } else if (e.getMessage().contains("Duplicate entry")) {
+                errorMessage += "A product with this name already exists.";
+            } else {
+                errorMessage += e.getMessage();
+            }
+            
             JOptionPane.showMessageDialog(null,
-                    "Failed to update inventory item: " + e.getMessage(),
+                    errorMessage,
                     "Database Error",
                     JOptionPane.ERROR_MESSAGE);
             return false;
@@ -280,7 +353,9 @@ public class RestaurantController {
     }
 
     public boolean createOrder(Order order, List<OrderItem> items, List<Integer> employeeIds) {
-        return orderDAO.createOrder(order, items, employeeIds);
+        order.setItems(items);
+        order.setAssignedEmployees(employeeIds);
+        return orderDAO.createOrder(order) > 0;
     }
 
     public List<Order> getOrdersByDateRange(String startDate, String endDate) {
@@ -609,64 +684,23 @@ public class RestaurantController {
         return items;
     }
 
-    public boolean restockInventory(int productId, int newQuantity, int employeeId) {
+    public boolean restockInventory(int productId, int newQuantity, int employeeId) throws SQLException {
         // First check if the employee exists and is authorized
         Employee employee = getEmployeeById(employeeId);
         if (employee == null) {
-            JOptionPane.showMessageDialog(null,
-                "Invalid employee ID",
-                "Error",
-                JOptionPane.ERROR_MESSAGE);
-            return false;
+            throw new SQLException("Invalid employee ID");
         }
 
         // Get current quantity to verify increase
         Inventory item = getInventoryItemById(productId);
         if (item == null) {
-            JOptionPane.showMessageDialog(null,
-                "Invalid product ID",
-                "Error",
-                JOptionPane.ERROR_MESSAGE);
-            return false;
+            throw new SQLException("Invalid product ID");
         }
 
         if (newQuantity <= item.getQuantity()) {
-            JOptionPane.showMessageDialog(null,
-                "New quantity must be greater than current quantity",
-                "Error",
-                JOptionPane.ERROR_MESSAGE);
-            return false;
+            throw new SQLException("New quantity must be greater than current quantity");
         }
 
-        String query = """
-            UPDATE InventoryItems 
-            SET quantity = ?, 
-                last_restock = CURRENT_TIMESTAMP, 
-                last_restocked_by = ? 
-            WHERE product_id = ?
-        """;
-        
-        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
-            stmt.setInt(1, newQuantity);
-            stmt.setInt(2, employeeId);
-            stmt.setInt(3, productId);
-            
-            boolean success = stmt.executeUpdate() > 0;
-            if (success) {
-                JOptionPane.showMessageDialog(null,
-                    String.format("Successfully updated %s stock from %d to %d",
-                        item.getProductName(), item.getQuantity(), newQuantity),
-                    "Success",
-                    JOptionPane.INFORMATION_MESSAGE);
-            }
-            return success;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Failed to restock inventory: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
-            return false;
-        }
+        return inventoryDAO.updateStock(productId, newQuantity);
     }
 } 
