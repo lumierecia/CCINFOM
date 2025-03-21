@@ -108,10 +108,20 @@ public class InventoryDAO {
     }
 
     public boolean updateStock(int productId, int quantity) {
-        String query = "UPDATE InventoryItems SET quantity = quantity + ? WHERE product_id = ?";
+        String query = """
+            UPDATE InventoryItems 
+            SET quantity = ?, 
+                status = CASE 
+                    WHEN ? = 0 THEN 'Unavailable'
+                    ELSE 'Available'
+                END,
+                last_restock = CURRENT_TIMESTAMP
+            WHERE product_id = ?
+        """;
         try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, quantity);
-            pstmt.setInt(2, productId);
+            pstmt.setInt(2, quantity);
+            pstmt.setInt(3, productId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();

@@ -2,10 +2,12 @@ package view;
 
 import controller.RestaurantController;
 import model.Inventory;
+import util.DatabaseErrorHandler;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
+import java.sql.SQLException;
 
 public class InventoryPanel extends JPanel {
     private final RestaurantController controller;
@@ -22,19 +24,19 @@ public class InventoryPanel extends JPanel {
 
         // Create the table model with non-editable cells
         String[] columns = {
-            "ID", "Name", "Category", "Quantity", "Make Price", "Sell Price", "Actions"
+            "ID", "Name", "Category", "Quantity", "Make Price", "Sell Price", "Status", "Actions"
         };
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 6; // Only allow editing the Actions column
+                return column == 7; // Only allow editing the Actions column
             }
         };
         
         // Create and set up the table
         inventoryTable = new JTable(tableModel);
-        inventoryTable.getColumnModel().getColumn(6).setCellRenderer(new ButtonRenderer());
-        inventoryTable.getColumnModel().getColumn(6).setCellEditor(new ButtonEditor(new JCheckBox()));
+        inventoryTable.getColumnModel().getColumn(7).setCellRenderer(new ButtonRenderer());
+        inventoryTable.getColumnModel().getColumn(7).setCellEditor(new ButtonEditor(new JCheckBox()));
         
         // Create top control panel
         JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -104,6 +106,7 @@ public class InventoryPanel extends JPanel {
                     item.getQuantity(),
                     String.format("%.2f", item.getMakePrice()),
                     String.format("%.2f", item.getSellPrice()),
+                    item.getStatus(),
                     "Restock"
                 };
                 tableModel.addRow(row);
@@ -203,9 +206,16 @@ public class InventoryPanel extends JPanel {
             int newQuantity = (Integer) quantitySpinner.getValue();
             int employeeId = (Integer) employeeSpinner.getValue();
             
-            if (controller.restockInventory(productId, newQuantity, employeeId)) {
-                dialog.dispose();
-                refreshTable();
+            try {
+                if (controller.restockInventory(productId, newQuantity, employeeId)) {
+                    dialog.dispose();
+                    refreshTable();
+                }
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(dialog,
+                    DatabaseErrorHandler.getUserFriendlyMessage(ex),
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
             }
         });
         

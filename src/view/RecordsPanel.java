@@ -92,7 +92,8 @@ public class RecordsPanel extends JPanel {
                 item.getCategoryId(),
                 item.getMakePrice(),
                 item.getSellPrice(),
-                item.getQuantity()
+                item.getQuantity(),
+                item.getQuantity() == 0 ? "Unavailable" : "Available"
             });
         }
     }
@@ -134,7 +135,8 @@ public class RecordsPanel extends JPanel {
                 item.getCategoryId(),
                 item.getMakePrice(),
                 item.getSellPrice(),
-                item.getQuantity()
+                item.getQuantity(),
+                item.getQuantity() == 0 ? "Unavailable" : "Available"
             });
         }
     }
@@ -168,12 +170,60 @@ public class RecordsPanel extends JPanel {
                 "Add New Item", JOptionPane.OK_CANCEL_OPTION);
         if (result == JOptionPane.OK_OPTION) {
             try {
-                String name = nameField.getText();
+                String name = nameField.getText().trim();
+                if (name.isEmpty()) {
+                    JOptionPane.showMessageDialog(this,
+                            "Please enter a name for the item.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
                 String category = (String) categoryField.getSelectedItem();
-                double makePrice = Double.parseDouble(makePriceField.getText());
-                double sellPrice = Double.parseDouble(sellPriceField.getText());
-                int quantity = Integer.parseInt(quantityField.getText());
-                String recipe = recipeField.getText();
+                if (category == null) {
+                    JOptionPane.showMessageDialog(this,
+                            "Please select a category.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                double makePrice = Double.parseDouble(makePriceField.getText().trim());
+                if (makePrice <= 0) {
+                    JOptionPane.showMessageDialog(this,
+                            "Make price must be greater than 0.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                double sellPrice = Double.parseDouble(sellPriceField.getText().trim());
+                if (sellPrice <= 0) {
+                    JOptionPane.showMessageDialog(this,
+                            "Sell price must be greater than 0.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                if (sellPrice <= makePrice) {
+                    JOptionPane.showMessageDialog(this,
+                            "Sell price must be greater than make price.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                int quantity = Integer.parseInt(quantityField.getText().trim());
+                if (quantity < 0) {
+                    JOptionPane.showMessageDialog(this,
+                            "Quantity cannot be negative.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                String recipe = recipeField.getText().trim();
 
                 if (controller.addInventoryItem(name, category, makePrice, sellPrice, quantity, recipe)) {
                     loadData();

@@ -23,7 +23,18 @@ public class Inventory {
         this.quantity = quantity;
         this.makePrice = makePrice;
         this.sellPrice = sellPrice;
-        this.status = "Available";
+        this.status = quantity == 0 ? "Unavailable" : "Available";
+    }
+
+    public Inventory(int productId, String productName, String categoryName, 
+                    int quantity, double makePrice, double sellPrice, String status) {
+        this.productId = productId;
+        this.productName = productName;
+        this.categoryName = categoryName;
+        this.quantity = quantity;
+        this.makePrice = makePrice;
+        this.sellPrice = sellPrice;
+        this.status = status;
     }
 
     // Getters and setters
@@ -81,6 +92,7 @@ public class Inventory {
 
     public void setQuantity(int quantity) {
         this.quantity = quantity;
+        this.status = quantity == 0 ? "Unavailable" : "Available";
     }
 
     public String getStatus() {
