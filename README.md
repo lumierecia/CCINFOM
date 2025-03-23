@@ -1,4 +1,4 @@
-# Restaurant Management System
+# Restaurant Management System - CCINFOM G5 MP
 
 A Java-based restaurant management system that handles inventory, orders, employees, and customer management.
 
@@ -85,7 +85,7 @@ sql/
 
 ## Database Design
 
-The system uses MySQL with a well-structured database design. The Entity Relationship Diagram (ERD) can be found in `sql/infomdbreal.eerd`.
+The system uses MySQL with a well-structured database design. The Entity Relationship Diagram (ERD) can be found in `sql/infomdbreal.mwb`.
 
 ### Main Tables
 - `InventoryItems`: Stores product information
@@ -123,7 +123,9 @@ The system uses MySQL with a well-structured database design. The Entity Relatio
 1. Ensure you have Java 17 or later installed
 2. Set up MySQL database
 3. Run the `Group8_DB.sql` script to create the database schema
-4. Update database connection details in `DatabaseConnection.java`
+
+4. Update database connection details in `DatabaseConnection.java` (change the password!!)
+
 5. Compile and run the application:
    ```bash
    javac src/view/MainFrame.java
@@ -139,48 +141,3 @@ The system includes comprehensive error handling through `DatabaseErrorHandler.j
 - Connection issues
 - User-friendly error messages
 - Proper exception propagation
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Future Improvements
-
-### 1. Restock History Tracking
-- Implement a dedicated `RestockHistory` table to track:
-  - Complete history of all restocking events
-  - Previous quantities and changes
-  - Timestamps of all restocks
-  - Employee responsible for each restock
-  - Notes and reasons for restocking
-- Benefits:
-  - Better audit trails
-  - Inventory movement analysis
-  - Employee performance tracking
-  - Seasonal trend identification
-  - More accurate reporting
-
-### 2. Additional Feature Ideas
-- Advanced reporting and analytics
-- Inventory forecasting
-- Employee scheduling optimization
-- Customer loyalty program
-- Mobile application support
-
-## Current Implementation
-
-The current system tracks the most recent restock through:
-- `last_restock` timestamp in `InventoryItems`
-- `last_restocked_by` employee reference
-- Current quantity tracking
-- Status updates (Available/Unavailable)
-
-This provides basic inventory management while maintaining simplicity and staying within the current database specifications.
