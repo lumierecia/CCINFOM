@@ -52,7 +52,8 @@ public class MainFrame extends JFrame {
         tabbedPane.addTab("Transactions", new TransactionsPanel(controller));  // This already contains Orders, Payments, and Shifts
         tabbedPane.addTab("Employees", new EmployeePanel(controller));
         tabbedPane.addTab("Suppliers", new SupplierPanel(controller));
-        tabbedPane.addTab("Inventory", new RecordsPanel(controller));
+        tabbedPane.addTab("Menu Items", new RecordsPanel(controller));  // Renamed from "Inventory" to "Menu Items" for clarity
+        tabbedPane.addTab("Ingredients", new IngredientPanel(controller));  // Added new Ingredients tab
         tabbedPane.addTab("Reports", new ReportsPanel(controller));
     }
 

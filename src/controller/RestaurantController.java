@@ -17,6 +17,8 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JOptionPane;
+import model.Ingredient;
+import model.IngredientBatch;
 
 public class RestaurantController {
     private final Connection connection;
@@ -41,7 +43,7 @@ public class RestaurantController {
         }
     }
 
-    private Connection getConnection() throws SQLException {
+    public Connection getConnection() throws SQLException {
         return DatabaseConnection.getConnection();
     }
 
@@ -425,7 +427,34 @@ public class RestaurantController {
     }
 
     public List<Supplier> getAllSuppliers() {
-        return supplierDAO.getAllSuppliers();
+        List<Supplier> suppliers = new ArrayList<>();
+        String query = "SELECT supplier_id, name, contact_person, phone, email, address, is_deleted " +
+                      "FROM Suppliers ORDER BY name";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+            
+            while (rs.next()) {
+                Supplier supplier = new Supplier();
+                supplier.setSupplierId(rs.getInt("supplier_id"));
+                supplier.setName(rs.getString("name"));
+                supplier.setContactPerson(rs.getString("contact_person"));
+                supplier.setPhone(rs.getString("phone"));
+                supplier.setEmail(rs.getString("email"));
+                supplier.setAddress(rs.getString("address"));
+                supplier.setDeleted(rs.getBoolean("is_deleted"));
+                suppliers.add(supplier);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to fetch suppliers: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+        
+        return suppliers;
     }
 
     public Supplier getSupplierById(int id) {
@@ -441,7 +470,21 @@ public class RestaurantController {
     }
 
     public boolean deleteSupplier(int supplierId) {
-        return supplierDAO.deleteSupplier(supplierId);
+        String query = "UPDATE Suppliers SET is_deleted = 1 WHERE supplier_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, supplierId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to delete supplier: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
     }
 
     public List<Inventory> getSupplierIngredients(int supplierId) {
@@ -784,5 +827,282 @@ public class RestaurantController {
 
     public boolean restoreInventoryItem(int productId) {
         return inventoryDAO.restoreInventoryItem(productId);
+    }
+
+    // Ingredient Management Methods
+    public List<Ingredient> getAllIngredients() {
+        List<Ingredient> ingredients = new ArrayList<>();
+        String query = "SELECT i.*, u.unit_name FROM Ingredients i " +
+                      "JOIN Units u ON i.unit_id = u.unit_id " +
+                      "WHERE i.is_deleted = FALSE";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Ingredient ingredient = new Ingredient();
+                ingredient.setIngredientId(rs.getInt("ingredient_id"));
+                ingredient.setName(rs.getString("name"));
+                ingredient.setUnitId(rs.getInt("unit_id"));
+                ingredient.setUnitName(rs.getString("unit_name"));
+                ingredient.setQuantityInStock(rs.getDouble("quantity_in_stock"));
+                ingredient.setMinimumStockLevel(rs.getDouble("minimum_stock_level"));
+                ingredient.setCostPerUnit(rs.getDouble("cost_per_unit"));
+                Timestamp timestamp = rs.getTimestamp("last_restock_date");
+                if (timestamp != null) {
+                    ingredient.setLastRestockDate(new Date(timestamp.getTime()));
+                }
+                ingredients.add(ingredient);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ingredients;
+    }
+
+    public List<Ingredient> getLowStockIngredients() {
+        List<Ingredient> ingredients = new ArrayList<>();
+        String query = "SELECT i.*, u.unit_name FROM Ingredients i " +
+                      "JOIN Units u ON i.unit_id = u.unit_id " +
+                      "WHERE i.quantity_in_stock <= i.minimum_stock_level " +
+                      "AND i.is_deleted = FALSE";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Ingredient ingredient = new Ingredient();
+                ingredient.setIngredientId(rs.getInt("ingredient_id"));
+                ingredient.setName(rs.getString("name"));
+                ingredient.setUnitId(rs.getInt("unit_id"));
+                ingredient.setUnitName(rs.getString("unit_name"));
+                ingredient.setQuantityInStock(rs.getDouble("quantity_in_stock"));
+                ingredient.setMinimumStockLevel(rs.getDouble("minimum_stock_level"));
+                ingredient.setCostPerUnit(rs.getDouble("cost_per_unit"));
+                Timestamp timestamp = rs.getTimestamp("last_restock_date");
+                if (timestamp != null) {
+                    ingredient.setLastRestockDate(new Date(timestamp.getTime()));
+                }
+                ingredients.add(ingredient);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ingredients;
+    }
+
+    public List<IngredientBatch> getAllBatches() {
+        List<IngredientBatch> batches = new ArrayList<>();
+        String query = "SELECT b.*, i.name as ingredient_name, s.name as supplier_name " +
+                      "FROM IngredientBatches b " +
+                      "JOIN Ingredients i ON b.ingredient_id = i.ingredient_id " +
+                      "JOIN Suppliers s ON b.supplier_id = s.supplier_id " +
+                      "WHERE b.status != 'Depleted'";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                IngredientBatch batch = new IngredientBatch();
+                batch.setBatchId(rs.getInt("batch_id"));
+                batch.setIngredientId(rs.getInt("ingredient_id"));
+                batch.setIngredientName(rs.getString("ingredient_name"));
+                batch.setSupplierId(rs.getInt("supplier_id"));
+                batch.setSupplierName(rs.getString("supplier_name"));
+                batch.setQuantity(rs.getDouble("quantity"));
+                batch.setRemainingQuantity(rs.getDouble("remaining_quantity"));
+                
+                Timestamp purchaseTimestamp = rs.getTimestamp("purchase_date");
+                if (purchaseTimestamp != null) {
+                    batch.setPurchaseDate(new Date(purchaseTimestamp.getTime()));
+                }
+                
+                Date expiryDate = rs.getDate("expiry_date");
+                if (expiryDate != null) {
+                    batch.setExpiryDate(new Date(expiryDate.getTime()));
+                }
+                
+                batch.setPurchasePrice(rs.getDouble("purchase_price"));
+                batch.setStatus(rs.getString("status"));
+                batches.add(batch);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return batches;
+    }
+
+    public List<IngredientBatch> getExpiringBatches(int daysThreshold) {
+        List<IngredientBatch> batches = new ArrayList<>();
+        String query = "SELECT b.*, i.name as ingredient_name, s.name as supplier_name " +
+                      "FROM IngredientBatches b " +
+                      "JOIN Ingredients i ON b.ingredient_id = i.ingredient_id " +
+                      "JOIN Suppliers s ON b.supplier_id = s.supplier_id " +
+                      "WHERE b.expiry_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY) " +
+                      "AND b.status != 'Depleted' AND b.remaining_quantity > 0";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, daysThreshold);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                IngredientBatch batch = new IngredientBatch();
+                batch.setBatchId(rs.getInt("batch_id"));
+                batch.setIngredientId(rs.getInt("ingredient_id"));
+                batch.setIngredientName(rs.getString("ingredient_name"));
+                batch.setSupplierId(rs.getInt("supplier_id"));
+                batch.setSupplierName(rs.getString("supplier_name"));
+                batch.setQuantity(rs.getDouble("quantity"));
+                batch.setRemainingQuantity(rs.getDouble("remaining_quantity"));
+                
+                Timestamp purchaseTimestamp = rs.getTimestamp("purchase_date");
+                if (purchaseTimestamp != null) {
+                    batch.setPurchaseDate(new Date(purchaseTimestamp.getTime()));
+                }
+                
+                Date expiryDate = rs.getDate("expiry_date");
+                if (expiryDate != null) {
+                    batch.setExpiryDate(new Date(expiryDate.getTime()));
+                }
+                
+                batch.setPurchasePrice(rs.getDouble("purchase_price"));
+                batch.setStatus(rs.getString("status"));
+                batches.add(batch);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return batches;
+    }
+
+    public void addIngredient(Ingredient ingredient) throws SQLException {
+        String query = "INSERT INTO Ingredients (name, unit_id, quantity_in_stock, minimum_stock_level, cost_per_unit, last_restock_date, last_restocked_by, is_deleted) " +
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, 0)";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            
+            stmt.setString(1, ingredient.getName());
+            stmt.setInt(2, ingredient.getUnitId());
+            stmt.setDouble(3, ingredient.getQuantityInStock());
+            stmt.setDouble(4, ingredient.getMinimumStockLevel());
+            stmt.setDouble(5, ingredient.getCostPerUnit());
+            stmt.setTimestamp(6, new Timestamp(ingredient.getLastRestockDate().getTime()));
+            stmt.setInt(7, ingredient.getLastRestockedBy());
+            
+            stmt.executeUpdate();
+            
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    ingredient.setIngredientId(rs.getInt(1));
+                }
+            }
+        }
+    }
+
+    public void updateIngredient(Ingredient ingredient) throws SQLException {
+        String query = "UPDATE Ingredients SET name = ?, unit_id = ?, quantity_in_stock = ?, " +
+                      "minimum_stock_level = ?, cost_per_unit = ?, last_restock_date = ?, " +
+                      "last_restocked_by = ? WHERE ingredient_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setString(1, ingredient.getName());
+            stmt.setInt(2, ingredient.getUnitId());
+            stmt.setDouble(3, ingredient.getQuantityInStock());
+            stmt.setDouble(4, ingredient.getMinimumStockLevel());
+            stmt.setDouble(5, ingredient.getCostPerUnit());
+            stmt.setTimestamp(6, new Timestamp(ingredient.getLastRestockDate().getTime()));
+            stmt.setInt(7, ingredient.getLastRestockedBy());
+            stmt.setInt(8, ingredient.getIngredientId());
+            
+            stmt.executeUpdate();
+        }
+    }
+
+    public void deleteIngredient(int ingredientId) throws SQLException {
+        String query = "UPDATE Ingredients SET is_deleted = 1 WHERE ingredient_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, ingredientId);
+            stmt.executeUpdate();
+        }
+    }
+
+    public void addIngredientBatch(IngredientBatch batch) throws SQLException {
+        String query = "INSERT INTO IngredientBatches (ingredient_id, supplier_id, quantity, purchase_date, " +
+                      "expiry_date, purchase_price, remaining_quantity, status) " +
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+            
+            stmt.setInt(1, batch.getIngredientId());
+            stmt.setInt(2, batch.getSupplierId());
+            stmt.setDouble(3, batch.getQuantity());
+            stmt.setTimestamp(4, new Timestamp(batch.getPurchaseDate().getTime()));
+            stmt.setTimestamp(5, new Timestamp(batch.getExpiryDate().getTime()));
+            stmt.setDouble(6, batch.getPurchasePrice());
+            stmt.setDouble(7, batch.getRemainingQuantity());
+            stmt.setString(8, batch.getStatus());
+            
+            stmt.executeUpdate();
+            
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    batch.setBatchId(rs.getInt(1));
+                }
+            }
+
+            // Update ingredient stock level
+            updateIngredientStock(batch.getIngredientId());
+        }
+    }
+
+    public void updateIngredientBatch(IngredientBatch batch) throws SQLException {
+        String query = "UPDATE IngredientBatches SET quantity = ?, purchase_date = ?, expiry_date = ?, " +
+                      "purchase_price = ?, remaining_quantity = ?, status = ? WHERE batch_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setDouble(1, batch.getQuantity());
+            stmt.setTimestamp(2, new Timestamp(batch.getPurchaseDate().getTime()));
+            stmt.setTimestamp(3, new Timestamp(batch.getExpiryDate().getTime()));
+            stmt.setDouble(4, batch.getPurchasePrice());
+            stmt.setDouble(5, batch.getRemainingQuantity());
+            stmt.setString(6, batch.getStatus());
+            stmt.setInt(7, batch.getBatchId());
+            
+            stmt.executeUpdate();
+
+            // Update ingredient stock level
+            updateIngredientStock(batch.getIngredientId());
+        }
+    }
+
+    private void updateIngredientStock(int ingredientId) throws SQLException {
+        String query = "UPDATE Ingredients i " +
+                      "SET quantity_in_stock = (SELECT COALESCE(SUM(remaining_quantity), 0) " +
+                      "                        FROM IngredientBatches b " +
+                      "                        WHERE b.ingredient_id = i.ingredient_id " +
+                      "                        AND b.status = 'ACTIVE'), " +
+                      "    last_restock_date = CURRENT_TIMESTAMP " +
+                      "WHERE i.ingredient_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, ingredientId);
+            stmt.executeUpdate();
+        }
     }
 } 

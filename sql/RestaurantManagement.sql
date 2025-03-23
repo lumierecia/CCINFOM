@@ -1,8 +1,18 @@
-DROP DATABASE IF EXISTS `s17_group8`;
-CREATE DATABASE IF NOT EXISTS `s17_group8`;
-USE `s17_group8`;
+DROP DATABASE IF EXISTS `restaurantdb`;
+CREATE DATABASE IF NOT EXISTS `restaurantdb`;
+USE `restaurantdb`;
 
--- Core tables for employee management
+-- Reference tables for normalization (no dependencies)
+CREATE TABLE IF NOT EXISTS `Units` (
+    unit_id INT AUTO_INCREMENT PRIMARY KEY,
+    unit_name VARCHAR(20) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS `Categories` (
+    category_id INT AUTO_INCREMENT PRIMARY KEY,
+    category_name VARCHAR(50) NOT NULL UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS `Roles` (
     role_id INT AUTO_INCREMENT PRIMARY KEY,
     role_name VARCHAR(50) NOT NULL UNIQUE
@@ -15,6 +25,7 @@ CREATE TABLE IF NOT EXISTS `TimeShifts` (
     time_end TIME NOT NULL
 );
 
+-- Core tables for employee management
 CREATE TABLE IF NOT EXISTS `Employees` (
     employee_id INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
@@ -26,18 +37,32 @@ CREATE TABLE IF NOT EXISTS `Employees` (
     FOREIGN KEY (time_shiftid) REFERENCES TimeShifts(time_shiftid)
 );
 
--- Reference tables for normalization
-CREATE TABLE IF NOT EXISTS `Units` (
-    unit_id INT AUTO_INCREMENT PRIMARY KEY,
-    unit_name VARCHAR(20) NOT NULL UNIQUE
+-- Core tables for customer management
+CREATE TABLE IF NOT EXISTS `Customers` (
+    customer_id INT AUTO_INCREMENT PRIMARY KEY,
+    last_name VARCHAR(50) NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE KEY,
+    phonenumber VARCHAR(20) NOT NULL UNIQUE KEY,
+    address VARCHAR(200) NOT NULL,
+    is_deleted BOOLEAN DEFAULT FALSE
 );
 
-CREATE TABLE IF NOT EXISTS `Categories` (
-    category_id INT AUTO_INCREMENT PRIMARY KEY,
-    category_name VARCHAR(50) NOT NULL UNIQUE
+-- Core tables for order management
+CREATE TABLE IF NOT EXISTS `Orders` (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    order_type ENUM('Dine-In', 'Takeout', 'Delivery') NOT NULL,
+    order_status ENUM('In Progress', 'Ready', 'Served', 'Completed', 'Cancelled') NOT NULL DEFAULT 'In Progress',
+    order_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    total_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+    payment_method ENUM('Cash', 'Credit Card') NULL,
+    payment_status ENUM('Pending', 'Paid') NOT NULL DEFAULT 'Pending',
+    is_deleted BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
 );
 
--- Core tables for inventory and supplier management
+-- Core tables for supplier management
 CREATE TABLE IF NOT EXISTS `Suppliers` (
     supplier_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -49,6 +74,7 @@ CREATE TABLE IF NOT EXISTS `Suppliers` (
     is_deleted BOOLEAN DEFAULT FALSE
 );
 
+-- Core tables for inventory and ingredient management
 CREATE TABLE IF NOT EXISTS `Ingredients` (
     ingredient_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -58,8 +84,23 @@ CREATE TABLE IF NOT EXISTS `Ingredients` (
     cost_per_unit DECIMAL(10,2) NOT NULL,
     last_restock_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_restocked_by INT,
+    is_deleted BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (unit_id) REFERENCES Units(unit_id),
     FOREIGN KEY (last_restocked_by) REFERENCES Employees(employee_id)
+);
+
+CREATE TABLE IF NOT EXISTS `IngredientBatches` (
+    batch_id INT AUTO_INCREMENT PRIMARY KEY,
+    ingredient_id INT NOT NULL,
+    supplier_id INT NOT NULL,
+    quantity DECIMAL(10,2) NOT NULL,
+    purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expiry_date DATE,
+    purchase_price DECIMAL(10,2) NOT NULL,
+    remaining_quantity DECIMAL(10,2) NOT NULL,
+    status ENUM('Available', 'Low', 'Expired', 'Depleted') DEFAULT 'Available',
+    FOREIGN KEY (ingredient_id) REFERENCES Ingredients(ingredient_id),
+    FOREIGN KEY (supplier_id) REFERENCES Suppliers(supplier_id)
 );
 
 CREATE TABLE IF NOT EXISTS `IngredientSuppliers` (
@@ -101,30 +142,6 @@ CREATE TABLE IF NOT EXISTS `DishIngredients` (
     FOREIGN KEY (unit_id) REFERENCES Units(unit_id)
 );
 
--- Core tables for customer and order management
-CREATE TABLE IF NOT EXISTS `Customers` (
-    customer_id INT AUTO_INCREMENT PRIMARY KEY,
-    last_name VARCHAR(50) NOT NULL,
-    first_name VARCHAR(50) NOT NULL,
-    email VARCHAR(100) NOT NULL UNIQUE KEY,
-    phonenumber VARCHAR(20) NOT NULL UNIQUE KEY,
-    address VARCHAR(200) NOT NULL,
-    is_deleted BOOLEAN DEFAULT FALSE
-);
-
-CREATE TABLE IF NOT EXISTS `Orders` (
-    order_id INT AUTO_INCREMENT PRIMARY KEY,
-    customer_id INT NOT NULL,
-    order_type ENUM('Dine-In', 'Takeout', 'Delivery') NOT NULL,
-    order_status ENUM('In Progress', 'Ready', 'Served', 'Completed', 'Cancelled') NOT NULL DEFAULT 'In Progress',
-    order_datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    total_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
-    payment_method ENUM('Cash', 'Credit Card') NULL,
-    payment_status ENUM('Pending', 'Paid') NOT NULL DEFAULT 'Pending',
-    is_deleted BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
-);
-
 CREATE TABLE IF NOT EXISTS `OrderItems` (
     order_id INT NOT NULL,
     product_id INT NOT NULL,
@@ -143,7 +160,24 @@ CREATE TABLE IF NOT EXISTS `AssignedEmployeesToOrders` (
     FOREIGN KEY (employee_id) REFERENCES Employees(employee_id)
 );
 
--- Insert reference data first
+CREATE TABLE IF NOT EXISTS `IngredientTransactions` (
+    transaction_id INT AUTO_INCREMENT PRIMARY KEY,
+    ingredient_id INT NOT NULL,
+    transaction_type ENUM('Purchase', 'Usage', 'Adjustment', 'Waste') NOT NULL,
+    quantity_change DECIMAL(10,2) NOT NULL,
+    transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    unit_price DECIMAL(10,2),
+    supplier_id INT,
+    order_id INT,
+    employee_id INT NOT NULL,
+    notes TEXT,
+    FOREIGN KEY (ingredient_id) REFERENCES Ingredients(ingredient_id),
+    FOREIGN KEY (supplier_id) REFERENCES Suppliers(supplier_id),
+    FOREIGN KEY (order_id) REFERENCES Orders(order_id),
+    FOREIGN KEY (employee_id) REFERENCES Employees(employee_id)
+);
+
+-- Insert reference data
 INSERT INTO Units (unit_name) VALUES
 ('kg'),        -- 1
 ('liters'),    -- 2
@@ -169,6 +203,7 @@ INSERT INTO TimeShifts (shift_type, time_start, time_end) VALUES
 ('Afternoon', '12:00:00', '20:00:00'),  -- 2
 ('Night', '20:00:00', '04:00:00');      -- 3
 
+-- Insert sample data
 INSERT INTO Employees (first_name, last_name, role_id, time_shiftid) VALUES
 ('John', 'Wick', 1, 1),           -- 1: Waiter, Morning
 ('Sabrina', 'Carpenter', 2, 1),   -- 2: Chef, Morning
@@ -186,7 +221,6 @@ INSERT INTO Suppliers (name, contact_person, email, phone, address) VALUES
 ('Fresh Foods Supply', 'Maria Fresh', 'maria@freshfoods.com', '09171234573', '456 Market Ave, Quezon City'),           -- 2
 ('Quality Grocers', 'Peter Quality', 'peter@qualitygrocers.com', '09171234574', '789 Grocery Lane, Makati');          -- 3
 
--- Insert ingredients with unit_id instead of unit strings
 INSERT INTO Ingredients (name, unit_id, quantity_in_stock, minimum_stock_level, cost_per_unit, last_restocked_by) VALUES
 ('Rice', 1, 100.00, 20.00, 50.00, 1),           -- 1: kg
 ('Pork', 1, 50.00, 10.00, 280.00, 2),           -- 2: kg
@@ -220,7 +254,6 @@ INSERT INTO IngredientSuppliers (ingredient_id, supplier_id, unit_price, lead_ti
 (9, 1, 87.00, 2, 5.00, TRUE),    -- Onion from Metro
 (10, 1, 92.00, 2, 5.00, TRUE);   -- Tomato from Metro
 
--- Insert inventory items with category_id instead of category strings
 INSERT INTO InventoryItems (product_name, category_id, make_price, sell_price, quantity, last_restocked_by, recipe_instructions) VALUES 
 ('Pork Sinigang', 1, 170.00, 250.00, 50, 1, 'Boil pork with vegetables in tamarind-based soup until tender.'),           -- 1: Main Course
 ('Kare-kare', 1, 230.00, 350.00, 50, 2, 'Cook beef until tender. Prepare peanut sauce.'),                               -- 2: Main Course
@@ -234,7 +267,6 @@ INSERT INTO InventoryItems (product_name, category_id, make_price, sell_price, q
 ('Steamed Rice', 4, 20.00, 40.00, 50, 9, 'Wash rice thoroughly. Cook in rice cooker.'),                                 -- 10: Sides
 ('Mashed Potatoes', 4, 50.00, 70.00, 50, 10, 'Boil potatoes until tender. Mash with butter and milk.');                -- 11: Sides
 
--- Insert dish ingredients with unit_id instead of unit strings
 INSERT INTO DishIngredients (product_id, ingredient_id, quantity_needed, unit_id) VALUES
 -- Pork Sinigang (product_id = 1)
 (1, 2, 0.3, 1),    -- Pork, 0.3 kg
@@ -253,7 +285,6 @@ INSERT INTO DishIngredients (product_id, ingredient_id, quantity_needed, unit_id
 (3, 7, 0.1, 2),     -- Vinegar, 0.1 liters
 (3, 8, 0.05, 1);    -- Garlic, 0.05 kg
 
--- Insert sample customers
 INSERT INTO Customers (last_name, first_name, email, phonenumber, address) VALUES
 ('Smith', 'John', 'john.smith@example.com', '09171234567', '123 Main St, Cityville'),      -- 1
 ('Doe', 'Jane', 'jane.doe@example.com', '09171234568', '456 Oak St, Townsville'),         -- 2
@@ -261,7 +292,6 @@ INSERT INTO Customers (last_name, first_name, email, phonenumber, address) VALUE
 ('Taylor', 'Alex', 'alex.taylor@example.com', '09171234570', '101 Birch St, Foresthill'), -- 4
 ('Brown', 'Emily', 'emily.brown@example.com', '09171234571', '202 Maple St, Lakeside');   -- 5
 
--- Insert sample orders
 INSERT INTO Orders (customer_id, order_type, order_status, total_amount, payment_method, payment_status) VALUES
 (1, 'Dine-In', 'In Progress', 450.00, NULL, 'Pending'),      -- 1
 (2, 'Takeout', 'Ready', 350.00, 'Cash', 'Paid'),            -- 2
@@ -269,7 +299,6 @@ INSERT INTO Orders (customer_id, order_type, order_status, total_amount, payment
 (4, 'Dine-In', 'Served', 650.00, NULL, 'Pending'),          -- 4
 (5, 'Takeout', 'In Progress', 250.00, NULL, 'Pending');      -- 5
 
--- Insert order items with actual prices at time of order
 INSERT INTO OrderItems (order_id, product_id, quantity, price_at_time) VALUES
 (1, 1, 1, 250.00),  -- Pork Sinigang
 (1, 10, 2, 40.00),  -- Steamed Rice x2
@@ -281,7 +310,6 @@ INSERT INTO OrderItems (order_id, product_id, quantity, price_at_time) VALUES
 (5, 5, 1, 190.00),  -- Burger Steak
 (5, 10, 1, 40.00);  -- Steamed Rice
 
--- Assign employees to orders
 INSERT INTO AssignedEmployeesToOrders (order_id, employee_id) VALUES
 (1, 1),  -- John Wick (Waiter) for order 1
 (1, 2),  -- Sabrina Carpenter (Chef) for order 1

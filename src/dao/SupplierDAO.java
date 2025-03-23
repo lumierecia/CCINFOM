@@ -43,14 +43,13 @@ public class SupplierDAO {
     }
 
     public boolean addSupplier(Supplier supplier) {
-        String query = "INSERT INTO Suppliers (name, contact_person, email, phone, address, status) VALUES (?, ?, ?, ?, ?, ?)";
+        String query = "INSERT INTO Suppliers (name, contact_person, email, phone, address) VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement pstmt = getConnection().prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, supplier.getName());
             pstmt.setString(2, supplier.getContactPerson());
             pstmt.setString(3, supplier.getEmail());
             pstmt.setString(4, supplier.getPhone());
             pstmt.setString(5, supplier.getAddress());
-            pstmt.setString(6, supplier.getStatus());
             
             int affectedRows = pstmt.executeUpdate();
             if (affectedRows > 0) {
@@ -69,15 +68,14 @@ public class SupplierDAO {
     }
 
     public boolean updateSupplier(Supplier supplier) {
-        String query = "UPDATE Suppliers SET name = ?, contact_person = ?, email = ?, phone = ?, address = ?, status = ? WHERE supplier_id = ?";
+        String query = "UPDATE Suppliers SET name = ?, contact_person = ?, email = ?, phone = ?, address = ? WHERE supplier_id = ?";
         try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setString(1, supplier.getName());
             pstmt.setString(2, supplier.getContactPerson());
             pstmt.setString(3, supplier.getEmail());
             pstmt.setString(4, supplier.getPhone());
             pstmt.setString(5, supplier.getAddress());
-            pstmt.setString(6, supplier.getStatus());
-            pstmt.setInt(7, supplier.getSupplierId());
+            pstmt.setInt(6, supplier.getSupplierId());
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -180,15 +178,14 @@ public class SupplierDAO {
              ResultSet rs = stmt.executeQuery(query)) {
             
             while (rs.next()) {
-                Supplier supplier = new Supplier(
-                    rs.getInt("supplier_id"),
-                    rs.getString("name"),
-                    rs.getString("contact_person"),
-                    rs.getString("email"),
-                    rs.getString("phone"),
-                    rs.getString("address"),
-                    rs.getString("status")
-                );
+                Supplier supplier = new Supplier();
+                supplier.setSupplierId(rs.getInt("supplier_id"));
+                supplier.setName(rs.getString("name"));
+                supplier.setContactPerson(rs.getString("contact_person"));
+                supplier.setEmail(rs.getString("email"));
+                supplier.setPhone(rs.getString("phone"));
+                supplier.setAddress(rs.getString("address"));
+                supplier.setDeleted(true);
                 suppliers.add(supplier);
             }
         } catch (SQLException e) {
@@ -220,14 +217,14 @@ public class SupplierDAO {
     }
 
     private Supplier mapResultSetToSupplier(ResultSet rs) throws SQLException {
-        return new Supplier(
-            rs.getInt("supplier_id"),
-            rs.getString("name"),
-            rs.getString("contact_person"),
-            rs.getString("email"),
-            rs.getString("phone"),
-            rs.getString("address"),
-            rs.getString("status")
-        );
+        Supplier supplier = new Supplier();
+        supplier.setSupplierId(rs.getInt("supplier_id"));
+        supplier.setName(rs.getString("name"));
+        supplier.setContactPerson(rs.getString("contact_person"));
+        supplier.setEmail(rs.getString("email"));
+        supplier.setPhone(rs.getString("phone"));
+        supplier.setAddress(rs.getString("address"));
+        supplier.setDeleted(rs.getBoolean("is_deleted"));
+        return supplier;
     }
 } 

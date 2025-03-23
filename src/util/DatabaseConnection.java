@@ -7,7 +7,7 @@ import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 
 public class DatabaseConnection {
-    private static final String URL = "jdbc:mysql://localhost:3306/s17_group8";
+    private static final String URL = "jdbc:mysql://localhost:3306/restaurantdb";
     private static final String USER = "root";
     private static final String PASSWORD = "cgkghj"; // Update this with your actual MySQL root password
     private static Connection connection = null;
@@ -58,10 +58,10 @@ public class DatabaseConnection {
                 } else if (e.getMessage().contains("Unknown database")) {
                     showError(
                         "Database Not Found",
-                        "The database 's17_group8' does not exist.\n\n" +
+                        "The database 'restaurantdb' does not exist.\n\n" +
                         "To fix this:\n" +
                         "1. Open MySQL Workbench or your MySQL terminal\n" +
-                        "2. Run: CREATE DATABASE s17_group8;\n" +
+                        "2. Run: CREATE DATABASE restaurantdb;\n" +
                         "3. Import the database schema from sql/Group8_DB.sql"
                     );
                 } else {

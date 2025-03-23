@@ -1,6 +1,6 @@
 package model;
 
-import java.sql.Timestamp;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -12,12 +12,17 @@ public class Ingredient {
     private double quantityInStock;
     private double minimumStockLevel;
     private double costPerUnit;
-    private Timestamp lastRestockDate;
+    private Date lastRestockDate;
     private int lastRestockedBy;
+    private boolean isDeleted;
     private Map<Integer, SupplierPrice> supplierPrices;
 
+    public Ingredient() {
+        // Default constructor
+    }
+
     public Ingredient(int ingredientId, String name, int unitId, String unitName, double quantityInStock,
-                     double minimumStockLevel, double costPerUnit, Timestamp lastRestockDate,
+                     double minimumStockLevel, double costPerUnit, Date lastRestockDate,
                      int lastRestockedBy) {
         this.ingredientId = ingredientId;
         this.name = name;
@@ -84,9 +89,10 @@ public class Ingredient {
     public double getQuantityInStock() { return quantityInStock; }
     public double getMinimumStockLevel() { return minimumStockLevel; }
     public double getCostPerUnit() { return costPerUnit; }
-    public Timestamp getLastRestockDate() { return lastRestockDate; }
+    public Date getLastRestockDate() { return lastRestockDate; }
     public int getLastRestockedBy() { return lastRestockedBy; }
     public Map<Integer, SupplierPrice> getSupplierPrices() { return supplierPrices; }
+    public boolean isDeleted() { return isDeleted; }
 
     // Setters
     public void setIngredientId(int ingredientId) { this.ingredientId = ingredientId; }
@@ -96,8 +102,9 @@ public class Ingredient {
     public void setQuantityInStock(double quantityInStock) { this.quantityInStock = quantityInStock; }
     public void setMinimumStockLevel(double minimumStockLevel) { this.minimumStockLevel = minimumStockLevel; }
     public void setCostPerUnit(double costPerUnit) { this.costPerUnit = costPerUnit; }
-    public void setLastRestockDate(Timestamp lastRestockDate) { this.lastRestockDate = lastRestockDate; }
+    public void setLastRestockDate(Date lastRestockDate) { this.lastRestockDate = lastRestockDate; }
     public void setLastRestockedBy(int lastRestockedBy) { this.lastRestockedBy = lastRestockedBy; }
+    public void setDeleted(boolean deleted) { isDeleted = deleted; }
     public void setSupplierPrices(Map<Integer, SupplierPrice> supplierPrices) { this.supplierPrices = supplierPrices; }
 
     @Override

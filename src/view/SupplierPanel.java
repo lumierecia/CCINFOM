@@ -85,14 +85,8 @@ public class SupplierPanel extends JPanel {
                     "Confirm Delete",
                     JOptionPane.YES_NO_OPTION);
                 if (confirm == JOptionPane.YES_OPTION) {
-                    if (controller.deleteSupplier(supplierId)) {
-                        loadSuppliers();
-                    } else {
-                        JOptionPane.showMessageDialog(this,
-                            "Failed to delete supplier.",
-                            "Error",
-                            JOptionPane.ERROR_MESSAGE);
-                    }
+                    controller.deleteSupplier(supplierId);
+                    loadSuppliers();
                 }
             } else {
                 JOptionPane.showMessageDialog(this,
@@ -128,7 +122,7 @@ public class SupplierPanel extends JPanel {
                 supplier.getEmail(),
                 supplier.getPhone(),
                 supplier.getAddress(),
-                supplier.getStatus()
+                supplier.isDeleted() ? "Inactive" : "Active"
             };
             tableModel.addRow(row);
         }
@@ -162,7 +156,7 @@ public class SupplierPanel extends JPanel {
             emailField.setText(supplier.getEmail());
             phoneField.setText(supplier.getPhone());
             addressField.setText(supplier.getAddress());
-            statusCombo.setSelectedItem(supplier.getStatus());
+            statusCombo.setSelectedItem(supplier.isDeleted() ? "Inactive" : "Active");
         }
 
         // Add components to form
@@ -220,15 +214,16 @@ public class SupplierPanel extends JPanel {
                 return;
             }
 
-            Supplier newSupplier = new Supplier(
-                supplier != null ? supplier.getSupplierId() : 0,
-                name,
-                contactPerson,
-                email,
-                phone,
-                address,
-                status
-            );
+            Supplier newSupplier = new Supplier();
+            if (supplier != null) {
+                newSupplier.setSupplierId(supplier.getSupplierId());
+            }
+            newSupplier.setName(name);
+            newSupplier.setContactPerson(contactPerson);
+            newSupplier.setEmail(email);
+            newSupplier.setPhone(phone);
+            newSupplier.setAddress(address);
+            newSupplier.setDeleted(status.equals("Inactive"));
 
             boolean success;
             if (supplier == null) {

@@ -202,7 +202,7 @@ public class IngredientDAO {
                 stmt.setDouble(3, ingredient.getQuantityInStock());
                 stmt.setDouble(4, ingredient.getMinimumStockLevel());
                 stmt.setDouble(5, ingredient.getCostPerUnit());
-                stmt.setTimestamp(6, ingredient.getLastRestockDate());
+                stmt.setTimestamp(6, new Timestamp(ingredient.getLastRestockDate().getTime()));
                 stmt.setInt(7, ingredient.getLastRestockedBy());
                 stmt.setInt(8, ingredient.getIngredientId());
                 
