@@ -5,6 +5,7 @@ import util.DatabaseConnection;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.JOptionPane;
 
 public class EmployeeDAO {
     private Connection getConnection() throws SQLException {
@@ -12,28 +13,37 @@ public class EmployeeDAO {
     }
 
     public Employee getEmployeeById(int employeeId) {
-        String query = """
-            SELECT e.*, r.role_name, ts.shift_type, ts.time_start, ts.time_end 
-            FROM Employees e 
-            LEFT JOIN Roles r ON e.role_id = r.role_id 
-            LEFT JOIN TimeShifts ts ON e.time_shiftid = ts.time_shiftid 
-            WHERE e.employee_id = ?
-        """;
+        String query = "SELECT e.*, r.role_name, ts.shift_type, ts.time_start, ts.time_end " +
+                      "FROM Employees e " +
+                      "LEFT JOIN Roles r ON e.role_id = r.role_id " +
+                      "LEFT JOIN TimeShifts ts ON e.time_shiftid = ts.time_shiftid " +
+                      "WHERE e.employee_id = ? AND e.is_deleted = FALSE";
         try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, employeeId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    Employee emp = new Employee(
-                        rs.getInt("employee_id"),
-                        rs.getString("first_name"),
-                        rs.getString("last_name"),
-                        rs.getString("role_name")
-                    );
-                    emp.setShiftType(rs.getString("shift_type"));
-                    emp.setShiftStart(rs.getTime("time_start"));
-                    emp.setShiftEnd(rs.getTime("time_end"));
-                    return emp;
-                }
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return mapResultSetToEmployee(rs);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public Employee getEmployeeByName(String firstName, String lastName) {
+        String query = """
+            SELECT e.*, r.role_name, ts.shift_type, ts.time_start, ts.time_end
+            FROM Employees e
+            LEFT JOIN Roles r ON e.role_id = r.role_id
+            LEFT JOIN TimeShifts ts ON e.time_shiftid = ts.time_shiftid
+            WHERE e.first_name = ? AND e.last_name = ?
+            """;
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
+            pstmt.setString(1, firstName);
+            pstmt.setString(2, lastName);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return mapResultSetToEmployee(rs);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -43,13 +53,11 @@ public class EmployeeDAO {
 
     public List<Employee> getAllEmployees() {
         List<Employee> employees = new ArrayList<>();
-        String query = """
-            SELECT e.*, r.role_name, ts.shift_type, ts.time_start, ts.time_end 
-            FROM Employees e 
-            LEFT JOIN Roles r ON e.role_id = r.role_id 
-            LEFT JOIN TimeShifts ts ON e.time_shiftid = ts.time_shiftid 
-            ORDER BY e.last_name, e.first_name
-        """;
+        String query = "SELECT e.*, r.role_name, ts.shift_type, ts.time_start, ts.time_end " +
+                      "FROM Employees e " +
+                      "LEFT JOIN Roles r ON e.role_id = r.role_id " +
+                      "LEFT JOIN TimeShifts ts ON e.time_shiftid = ts.time_shiftid " +
+                      "WHERE e.is_deleted = FALSE";
         try (Statement stmt = getConnection().createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
@@ -187,12 +195,37 @@ public class EmployeeDAO {
     }
 
     public boolean deleteEmployee(int employeeId) {
-        String query = "DELETE FROM Employees WHERE employee_id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
-            pstmt.setInt(1, employeeId);
-            return pstmt.executeUpdate() > 0;
+        // First check if employee is assigned to any active orders
+        String checkQuery = "SELECT COUNT(*) FROM AssignedEmployeesToOrders aeo " +
+                          "JOIN Orders o ON aeo.order_id = o.order_id " +
+                          "WHERE aeo.employee_id = ? AND o.is_deleted = FALSE";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
+            
+            checkStmt.setInt(1, employeeId);
+            try (ResultSet rs = checkStmt.executeQuery()) {
+                if (rs.next() && rs.getInt(1) > 0) {
+                    JOptionPane.showMessageDialog(null,
+                        "Cannot delete employee because they are assigned to existing orders.",
+                        "Delete Failed",
+                        JOptionPane.WARNING_MESSAGE);
+                    return false;
+                }
+            }
+            
+            // If no active orders, proceed with soft delete
+            String updateQuery = "UPDATE Employees SET is_deleted = TRUE WHERE employee_id = ?";
+            try (PreparedStatement updateStmt = conn.prepareStatement(updateQuery)) {
+                updateStmt.setInt(1, employeeId);
+                return updateStmt.executeUpdate() > 0;
+            }
         } catch (SQLException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to delete employee: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
             return false;
         }
     }
@@ -238,5 +271,97 @@ public class EmployeeDAO {
             e.printStackTrace();
         }
         return null;
+    }
+
+    public List<Employee> searchEmployees(String searchTerm) {
+        List<Employee> employees = new ArrayList<>();
+        String query = "SELECT e.*, r.role_name, ts.shift_type, ts.time_start, ts.time_end " +
+                      "FROM Employees e " +
+                      "LEFT JOIN Roles r ON e.role_id = r.role_id " +
+                      "LEFT JOIN TimeShifts ts ON e.time_shiftid = ts.time_shiftid " +
+                      "WHERE e.is_deleted = FALSE AND " +
+                      "(e.first_name LIKE ? OR e.last_name LIKE ?) " +
+                      "ORDER BY e.last_name, e.first_name";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
+            pstmt.setString(1, "%" + searchTerm + "%");
+            pstmt.setString(2, "%" + searchTerm + "%");
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Employee emp = mapResultSetToEmployee(rs);
+                    employees.add(emp);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return employees;
+    }
+
+    public List<Employee> getDeletedEmployees() {
+        List<Employee> employees = new ArrayList<>();
+        String query = """
+            SELECT e.*, r.role_name, ts.shift_type 
+            FROM Employees e 
+            JOIN Roles r ON e.role_id = r.role_id 
+            LEFT JOIN TimeShifts ts ON e.time_shiftid = ts.time_shiftid 
+            WHERE e.is_deleted = TRUE
+            ORDER BY e.last_name, e.first_name
+        """;
+        
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Employee employee = new Employee(
+                    rs.getInt("employee_id"),
+                    rs.getString("first_name"),
+                    rs.getString("last_name"),
+                    rs.getInt("role_id")
+                );
+                employee.setTimeShiftId(rs.getInt("time_shiftid"));
+                employee.setRoleName(rs.getString("role_name"));
+                employee.setShiftType(rs.getString("shift_type"));
+                employees.add(employee);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to fetch deleted employees: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+        return employees;
+    }
+
+    public boolean restoreEmployee(int employeeId) {
+        String query = "UPDATE Employees SET is_deleted = FALSE WHERE employee_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, employeeId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to restore employee: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
+    private Employee mapResultSetToEmployee(ResultSet rs) throws SQLException {
+        Employee emp = new Employee(
+            rs.getInt("employee_id"),
+            rs.getString("first_name"),
+            rs.getString("last_name"),
+            rs.getString("role_name")
+        );
+        emp.setShiftType(rs.getString("shift_type"));
+        emp.setShiftStart(rs.getTime("time_start"));
+        emp.setShiftEnd(rs.getTime("time_end"));
+        return emp;
     }
 } 

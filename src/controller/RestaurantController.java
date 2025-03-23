@@ -101,7 +101,7 @@ public class RestaurantController {
         try (PreparedStatement stmt = getConnection().prepareStatement(query);
              ResultSet rs = stmt.executeQuery()) {
             while (rs.next()) {
-                items.add(new Inventory(
+                Inventory item = new Inventory(
                     rs.getInt("product_id"),
                     rs.getString("product_name"),
                     rs.getString("category_name"),
@@ -109,7 +109,9 @@ public class RestaurantController {
                     rs.getDouble("make_price"),
                     rs.getDouble("sell_price"),
                     rs.getString("status")
-                ));
+                );
+                item.setRecipeInstructions(rs.getString("recipe_instructions"));
+                items.add(item);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -139,7 +141,7 @@ public class RestaurantController {
             stmt.setString(1, categoryName);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    items.add(new Inventory(
+                    Inventory item = new Inventory(
                         rs.getInt("product_id"),
                         rs.getString("product_name"),
                         rs.getString("category_name"),
@@ -147,7 +149,9 @@ public class RestaurantController {
                         rs.getDouble("make_price"),
                         rs.getDouble("sell_price"),
                         rs.getString("status")
-                    ));
+                    );
+                    item.setRecipeInstructions(rs.getString("recipe_instructions"));
+                    items.add(item);
                 }
             }
         } catch (SQLException e) {
@@ -172,7 +176,7 @@ public class RestaurantController {
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return new Inventory(
+                    Inventory item = new Inventory(
                         rs.getInt("product_id"),
                         rs.getString("product_name"),
                         rs.getString("category_name"),
@@ -180,6 +184,8 @@ public class RestaurantController {
                         rs.getDouble("make_price"),
                         rs.getDouble("sell_price")
                     );
+                    item.setRecipeInstructions(rs.getString("recipe_instructions"));
+                    return item;
                 }
             }
         } catch (SQLException e) {
@@ -398,6 +404,10 @@ public class RestaurantController {
         return employeeDAO.getEmployeeById(employeeId);
     }
 
+    public Employee getEmployeeByName(String firstName, String lastName) {
+        return employeeDAO.getEmployeeByName(firstName, lastName);
+    }
+
     public List<Employee> getAllEmployees() {
         return employeeDAO.getAllEmployees();
     }
@@ -456,14 +466,41 @@ public class RestaurantController {
         try (Connection conn = getConnection()) {
             conn.setAutoCommit(false);
             try {
+                // First check if the order exists and is pending payment
+                String checkQuery = """
+                    SELECT payment_status, order_status 
+                    FROM Orders 
+                    WHERE order_id = ?
+                """;
+                try (PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
+                    checkStmt.setInt(1, orderId);
+                    ResultSet rs = checkStmt.executeQuery();
+                    if (!rs.next()) {
+                        throw new SQLException("Order not found");
+                    }
+                    String currentPaymentStatus = rs.getString("payment_status");
+                    if (!"Pending".equals(currentPaymentStatus)) {
+                        throw new SQLException("Order is not pending payment");
+                    }
+                }
+
                 // Update order with payment information
-                String orderQuery = "UPDATE Orders SET order_status = 'Completed', payment_status = 'Paid', " +
-                                  "payment_method = ?, total_amount = ? WHERE order_id = ?";
+                String orderQuery = """
+                    UPDATE Orders 
+                    SET order_status = 'Completed', 
+                        payment_status = 'Paid', 
+                        payment_method = ?, 
+                        total_amount = ? 
+                    WHERE order_id = ?
+                """;
                 try (PreparedStatement orderStmt = conn.prepareStatement(orderQuery)) {
                     orderStmt.setString(1, paymentMethod);
                     orderStmt.setDouble(2, amountReceived);
                     orderStmt.setInt(3, orderId);
-                    orderStmt.executeUpdate();
+                    int updated = orderStmt.executeUpdate();
+                    if (updated != 1) {
+                        throw new SQLException("Failed to update order payment status");
+                    }
                 }
 
                 conn.commit();
@@ -471,10 +508,18 @@ public class RestaurantController {
             } catch (SQLException e) {
                 conn.rollback();
                 e.printStackTrace();
+                JOptionPane.showMessageDialog(null,
+                    "Failed to process payment: " + e.getMessage(),
+                    "Payment Error",
+                    JOptionPane.ERROR_MESSAGE);
                 return false;
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Database connection error: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
             return false;
         }
     }
@@ -559,26 +604,23 @@ public class RestaurantController {
     public void generateEmployeeShiftsReport(String datePattern, javax.swing.table.DefaultTableModel tableModel) {
         String query = """
             SELECT
-                e.employee_id,
                 e.first_name,
                 e.last_name,
-                COUNT(a.order_id) AS num_of_shifts,
-                SUM(
-                    TIMESTAMPDIFF(
-                        HOUR,
-                        ts.time_start,
-                        CASE
-                            WHEN ts.time_end < ts.time_start THEN ADDTIME(ts.time_end, '24:00:00')
-                            ELSE ts.time_end
-                        END
-                    )
-                ) AS total_hours_worked
-            FROM Employee e
+                COUNT(DISTINCT a.order_id) AS num_of_shifts,
+                TIMESTAMPDIFF(
+                    HOUR,
+                    ts.time_start,
+                    CASE
+                        WHEN ts.time_end < ts.time_start THEN ADDTIME(ts.time_end, '24:00:00')
+                        ELSE ts.time_end
+                    END
+                ) * COUNT(DISTINCT DATE(o.order_datetime)) AS total_hours_worked
+            FROM Employees e
             JOIN AssignedEmployeesToOrders a ON e.employee_id = a.employee_id
             JOIN Orders o ON a.order_id = o.order_id
             JOIN TimeShifts ts ON e.time_shiftid = ts.time_shiftid
             WHERE o.order_datetime LIKE ?
-            GROUP BY e.employee_id, e.first_name, e.last_name, ts.time_start, ts.time_end
+            GROUP BY e.employee_id, e.first_name, e.last_name
             ORDER BY total_hours_worked DESC
         """;
 
@@ -588,7 +630,6 @@ public class RestaurantController {
 
             while (rs.next()) {
                 Object[] row = {
-                    rs.getInt("employee_id"),
                     rs.getString("first_name"),
                     rs.getString("last_name"),
                     rs.getInt("num_of_shifts"),
@@ -608,14 +649,12 @@ public class RestaurantController {
     public void generateProfitMarginReport(String datePattern, javax.swing.table.DefaultTableModel tableModel) {
         String query = """
             SELECT
-                i.product_id,
-                o.order_id,
+                o.order_datetime,
                 COUNT(*) AS total_orders_with_item,
                 SUM(oi.quantity) AS total_amount_ordered,
                 SUM(oi.quantity) * i.sell_price AS total_revenue,
                 SUM(oi.quantity) * i.make_price AS total_cost,
-                (SUM(oi.quantity) * i.sell_price) - (SUM(oi.quantity) * i.make_price) AS total_profit,
-                o.order_datetime
+                (SUM(oi.quantity) * i.sell_price) - (SUM(oi.quantity) * i.make_price) AS total_profit
             FROM InventoryItems i
             JOIN OrderItems oi ON i.product_id = oi.product_id
             JOIN Orders o ON o.order_id = oi.order_id
@@ -630,8 +669,6 @@ public class RestaurantController {
 
             while (rs.next()) {
                 Object[] row = {
-                    rs.getInt("product_id"),
-                    rs.getInt("order_id"),
                     rs.getString("order_datetime"),
                     rs.getInt("total_orders_with_item"),
                     rs.getInt("total_amount_ordered"),
@@ -702,5 +739,50 @@ public class RestaurantController {
         }
 
         return inventoryDAO.updateStock(productId, newQuantity);
+    }
+
+    public boolean deleteOrder(int orderId) {
+        return orderDAO.deleteOrder(orderId);
+    }
+
+    // Methods for handling deleted records
+    public List<Customer> getDeletedCustomers() {
+        return customerDAO.getDeletedCustomers();
+    }
+
+    public List<Order> getDeletedOrders() {
+        return orderDAO.getDeletedOrders();
+    }
+
+    public List<Employee> getDeletedEmployees() {
+        return employeeDAO.getDeletedEmployees();
+    }
+
+    public List<Supplier> getDeletedSuppliers() {
+        return supplierDAO.getDeletedSuppliers();
+    }
+
+    public List<Inventory> getDeletedInventoryItems() {
+        return inventoryDAO.getDeletedInventoryItems();
+    }
+
+    public boolean restoreCustomer(int customerId) {
+        return customerDAO.restoreCustomer(customerId);
+    }
+
+    public boolean restoreOrder(int orderId) {
+        return orderDAO.restoreOrder(orderId);
+    }
+
+    public boolean restoreEmployee(int employeeId) {
+        return employeeDAO.restoreEmployee(employeeId);
+    }
+
+    public boolean restoreSupplier(int supplierId) {
+        return supplierDAO.restoreSupplier(supplierId);
+    }
+
+    public boolean restoreInventoryItem(int productId) {
+        return inventoryDAO.restoreInventoryItem(productId);
     }
 } 

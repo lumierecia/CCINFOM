@@ -5,7 +5,10 @@ import model.Customer;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.List;
+import java.util.ArrayList;
 
 public class CustomerPanel extends JPanel {
     private JTable customerTable;
@@ -16,6 +19,8 @@ public class CustomerPanel extends JPanel {
     private JButton deleteButton;
     private JButton viewOrdersButton;
     private JButton refreshButton;
+    private JButton helpButton;
+    private List<Integer> customerIds = new ArrayList<>();
 
     public CustomerPanel(RestaurantController controller) {
         this.controller = controller;
@@ -27,11 +32,11 @@ public class CustomerPanel extends JPanel {
     private void initComponents() {
         // Create toolbar
         JPanel toolBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        addButton = new JButton("Add Customer");
-        editButton = new JButton("Edit Customer");
-        deleteButton = new JButton("Delete Customer");
-        viewOrdersButton = new JButton("View Orders");
-        refreshButton = new JButton("Refresh");
+        addButton = createStyledButton("Add Customer", new Color(40, 167, 69));
+        editButton = createStyledButton("Edit Customer", new Color(255, 193, 7));
+        deleteButton = createStyledButton("Delete Customer", new Color(220, 53, 69));
+        viewOrdersButton = createStyledButton("View Orders", new Color(70, 130, 180));
+        refreshButton = createStyledButton("Refresh", new Color(108, 117, 125));
 
         toolBar.add(addButton);
         toolBar.add(editButton);
@@ -39,8 +44,16 @@ public class CustomerPanel extends JPanel {
         toolBar.add(viewOrdersButton);
         toolBar.add(refreshButton);
 
+        // Create help button
+        helpButton = new JButton("Help");
+        helpButton.setIcon(new ImageIcon(getClass().getResource("/icons/help.png")));
+        helpButton.addActionListener(e -> showHelp());
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        topPanel.add(helpButton);
+        add(topPanel, BorderLayout.NORTH);
+
         // Create table
-        String[] columnNames = {"ID", "First Name", "Last Name", "Email", "Phone", "Address"};
+        String[] columnNames = {"First Name", "Last Name", "Email", "Phone", "Address"};
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -59,7 +72,7 @@ public class CustomerPanel extends JPanel {
         editButton.addActionListener(e -> {
             int selectedRow = customerTable.getSelectedRow();
             if (selectedRow != -1) {
-                int customerId = (int) tableModel.getValueAt(selectedRow, 0);
+                int customerId = customerIds.get(selectedRow);
                 Customer customer = controller.getCustomerById(customerId);
                 if (customer != null) {
                     showCustomerDialog(customer);
@@ -74,7 +87,7 @@ public class CustomerPanel extends JPanel {
         deleteButton.addActionListener(e -> {
             int selectedRow = customerTable.getSelectedRow();
             if (selectedRow != -1) {
-                int customerId = (int) tableModel.getValueAt(selectedRow, 0);
+                int customerId = customerIds.get(selectedRow);
                 int confirm = JOptionPane.showConfirmDialog(this,
                     "Are you sure you want to delete this customer?",
                     "Confirm Delete",
@@ -99,8 +112,8 @@ public class CustomerPanel extends JPanel {
         viewOrdersButton.addActionListener(e -> {
             int selectedRow = customerTable.getSelectedRow();
             if (selectedRow != -1) {
-                int customerId = (int) tableModel.getValueAt(selectedRow, 0);
-                showOrderHistory(customerId);
+                int customerId = customerIds.get(selectedRow);
+                showCustomerOrders(customerId);
             } else {
                 JOptionPane.showMessageDialog(this,
                     "Please select a customer to view orders.",
@@ -113,10 +126,11 @@ public class CustomerPanel extends JPanel {
 
     private void loadCustomers() {
         tableModel.setRowCount(0);
+        customerIds.clear();
         List<Customer> customers = controller.getAllCustomers();
         for (Customer customer : customers) {
+            customerIds.add(customer.getCustomerId());
             Object[] row = {
-                customer.getCustomerId(),
                 customer.getFirstName(),
                 customer.getLastName(),
                 customer.getEmail(),
@@ -243,7 +257,7 @@ public class CustomerPanel extends JPanel {
         dialog.setVisible(true);
     }
 
-    private void showOrderHistory(int customerId) {
+    private void showCustomerOrders(int customerId) {
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
             "Order History", true);
         dialog.setLayout(new BorderLayout());
@@ -285,5 +299,37 @@ public class CustomerPanel extends JPanel {
         dialog.setSize(600, 400);
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
+    }
+
+    private void showHelp() {
+        HelpDialog helpDialog = new HelpDialog(SwingUtilities.getWindowAncestor(this), "Customers");
+        helpDialog.setVisible(true);
+    }
+
+    private JButton createStyledButton(String text, Color backgroundColor) {
+        JButton button = new JButton(text);
+        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
+        button.setBackground(backgroundColor);
+        button.setForeground(Color.BLACK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+
+        // Add hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(backgroundColor.brighter());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(backgroundColor);
+            }
+        });
+
+        return button;
     }
 } 

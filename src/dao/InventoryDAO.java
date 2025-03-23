@@ -5,6 +5,7 @@ import util.DatabaseConnection;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.JOptionPane;
 
 public class InventoryDAO {
     private Connection getConnection() throws SQLException {
@@ -13,28 +14,34 @@ public class InventoryDAO {
 
     public List<Inventory> getAllInventoryItems() {
         List<Inventory> items = new ArrayList<>();
-        String query = "SELECT * FROM InventoryItems ORDER BY product_name";
-        try (Statement stmt = getConnection().createStatement();
+        String query = "SELECT i.*, c.category_name FROM InventoryItems i " +
+                      "JOIN Categories c ON i.category_id = c.category_id " +
+                      "WHERE i.is_deleted = FALSE";
+        
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
+            
             while (rs.next()) {
-                Inventory item = new Inventory(
-                    rs.getInt("product_id"),
-                    rs.getString("product_name"),
-                    rs.getString("category"),
-                    rs.getInt("quantity"),
-                    rs.getDouble("make_price"),
-                    rs.getDouble("sell_price")
-                );
-                items.add(item);
+                items.add(mapResultSetToInventory(rs));
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to fetch inventory items: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
         }
         return items;
     }
 
     public Inventory getInventoryItemById(int productId) {
-        String query = "SELECT * FROM InventoryItems WHERE product_id = ?";
+        String query = """
+            SELECT i.*, c.category_name 
+            FROM InventoryItems i 
+            JOIN Categories c ON i.category_id = c.category_id 
+            WHERE i.product_id = ?
+            """;
         try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, productId);
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -42,7 +49,7 @@ public class InventoryDAO {
                     return new Inventory(
                         rs.getInt("product_id"),
                         rs.getString("product_name"),
-                        rs.getString("category"),
+                        rs.getString("category_name"),
                         rs.getInt("quantity"),
                         rs.getDouble("make_price"),
                         rs.getDouble("sell_price")
@@ -97,12 +104,19 @@ public class InventoryDAO {
     }
 
     public boolean deleteInventoryItem(int productId) {
-        String query = "DELETE FROM InventoryItems WHERE product_id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
-            pstmt.setInt(1, productId);
-            return pstmt.executeUpdate() > 0;
+        String query = "UPDATE InventoryItems SET is_deleted = TRUE WHERE product_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, productId);
+            return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to delete inventory item: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
             return false;
         }
     }
@@ -127,5 +141,75 @@ public class InventoryDAO {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public List<Inventory> getDeletedInventoryItems() {
+        List<Inventory> items = new ArrayList<>();
+        String query = """
+            SELECT i.*, c.category_name,
+                   CASE 
+                       WHEN i.quantity = 0 THEN 'Unavailable'
+                       ELSE 'Available'
+                   END as status
+            FROM InventoryItems i 
+            JOIN Categories c ON i.category_id = c.category_id 
+            WHERE i.is_deleted = TRUE
+            ORDER BY i.product_name
+        """;
+        
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Inventory item = new Inventory(
+                    rs.getInt("product_id"),
+                    rs.getString("product_name"),
+                    rs.getString("category_name"),
+                    rs.getInt("quantity"),
+                    rs.getDouble("make_price"),
+                    rs.getDouble("sell_price"),
+                    rs.getString("status")
+                );
+                item.setRecipeInstructions(rs.getString("recipe_instructions"));
+                items.add(item);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to fetch deleted inventory items: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+        return items;
+    }
+
+    public boolean restoreInventoryItem(int productId) {
+        String query = "UPDATE InventoryItems SET is_deleted = FALSE WHERE product_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, productId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to restore inventory item: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
+    private Inventory mapResultSetToInventory(ResultSet rs) throws SQLException {
+        return new Inventory(
+            rs.getInt("product_id"),
+            rs.getString("product_name"),
+            rs.getString("category_name"),
+            rs.getInt("quantity"),
+            rs.getDouble("make_price"),
+            rs.getDouble("sell_price")
+        );
     }
 } 

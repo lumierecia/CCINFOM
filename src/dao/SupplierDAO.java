@@ -6,6 +6,7 @@ import util.DatabaseConnection;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.JOptionPane;
 
 public class SupplierDAO {
     private Connection getConnection() throws SQLException {
@@ -13,20 +14,12 @@ public class SupplierDAO {
     }
 
     public Supplier getSupplierById(int supplierId) {
-        String query = "SELECT * FROM Suppliers WHERE supplier_id = ?";
+        String query = "SELECT * FROM Suppliers WHERE supplier_id = ? AND is_deleted = FALSE";
         try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, supplierId);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    return new Supplier(
-                        rs.getInt("supplier_id"),
-                        rs.getString("name"),
-                        rs.getString("contact_person"),
-                        rs.getString("email"),
-                        rs.getString("phone"),
-                        rs.getString("address"),
-                        rs.getString("status")
-                    );
+                    return mapResultSetToSupplier(rs);
                 }
             }
         } catch (SQLException e) {
@@ -37,20 +30,11 @@ public class SupplierDAO {
 
     public List<Supplier> getAllSuppliers() {
         List<Supplier> suppliers = new ArrayList<>();
-        String query = "SELECT * FROM Suppliers";
+        String query = "SELECT * FROM Suppliers WHERE is_deleted = FALSE ORDER BY name";
         try (Statement stmt = getConnection().createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
-                Supplier supplier = new Supplier(
-                    rs.getInt("supplier_id"),
-                    rs.getString("name"),
-                    rs.getString("contact_person"),
-                    rs.getString("email"),
-                    rs.getString("phone"),
-                    rs.getString("address"),
-                    rs.getString("status")
-                );
-                suppliers.add(supplier);
+                suppliers.add(mapResultSetToSupplier(rs));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -102,12 +86,35 @@ public class SupplierDAO {
     }
 
     public boolean deleteSupplier(int supplierId) {
-        String query = "DELETE FROM Suppliers WHERE supplier_id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
-            pstmt.setInt(1, supplierId);
-            return pstmt.executeUpdate() > 0;
+        // First check if supplier has any active ingredient relationships
+        String checkQuery = "SELECT COUNT(*) FROM IngredientSuppliers WHERE supplier_id = ? AND is_primary_supplier = TRUE";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
+            
+            checkStmt.setInt(1, supplierId);
+            try (ResultSet rs = checkStmt.executeQuery()) {
+                if (rs.next() && rs.getInt(1) > 0) {
+                    JOptionPane.showMessageDialog(null,
+                        "Cannot delete supplier because they are a primary supplier for some ingredients.",
+                        "Delete Failed",
+                        JOptionPane.WARNING_MESSAGE);
+                    return false;
+                }
+            }
+            
+            // If not a primary supplier, proceed with soft delete
+            String updateQuery = "UPDATE Suppliers SET is_deleted = TRUE WHERE supplier_id = ?";
+            try (PreparedStatement updateStmt = conn.prepareStatement(updateQuery)) {
+                updateStmt.setInt(1, supplierId);
+                return updateStmt.executeUpdate() > 0;
+            }
         } catch (SQLException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to delete supplier: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
             return false;
         }
     }
@@ -139,5 +146,88 @@ public class SupplierDAO {
             e.printStackTrace();
         }
         return ingredients;
+    }
+
+    public List<Supplier> searchSuppliers(String searchTerm) {
+        List<Supplier> suppliers = new ArrayList<>();
+        String query = "SELECT * FROM Suppliers WHERE is_deleted = FALSE AND " +
+                      "(name LIKE ? OR contact_person LIKE ? OR email LIKE ?) " +
+                      "ORDER BY name";
+        
+        try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
+            String term = "%" + searchTerm + "%";
+            pstmt.setString(1, term);
+            pstmt.setString(2, term);
+            pstmt.setString(3, term);
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    suppliers.add(mapResultSetToSupplier(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return suppliers;
+    }
+
+    public List<Supplier> getDeletedSuppliers() {
+        List<Supplier> suppliers = new ArrayList<>();
+        String query = "SELECT * FROM Suppliers WHERE is_deleted = TRUE ORDER BY name";
+        
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Supplier supplier = new Supplier(
+                    rs.getInt("supplier_id"),
+                    rs.getString("name"),
+                    rs.getString("contact_person"),
+                    rs.getString("email"),
+                    rs.getString("phone"),
+                    rs.getString("address"),
+                    rs.getString("status")
+                );
+                suppliers.add(supplier);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to fetch deleted suppliers: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+        return suppliers;
+    }
+
+    public boolean restoreSupplier(int supplierId) {
+        String query = "UPDATE Suppliers SET is_deleted = FALSE WHERE supplier_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, supplierId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to restore supplier: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
+    private Supplier mapResultSetToSupplier(ResultSet rs) throws SQLException {
+        return new Supplier(
+            rs.getInt("supplier_id"),
+            rs.getString("name"),
+            rs.getString("contact_person"),
+            rs.getString("email"),
+            rs.getString("phone"),
+            rs.getString("address"),
+            rs.getString("status")
+        );
     }
 } 

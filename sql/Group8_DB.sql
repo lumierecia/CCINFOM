@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS `Employees` (
     last_name VARCHAR(50) NOT NULL,
     role_id INT NOT NULL,
     time_shiftid INT,
+    is_deleted BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (role_id) REFERENCES Roles(role_id),
     FOREIGN KEY (time_shiftid) REFERENCES TimeShifts(time_shiftid)
 );
@@ -44,7 +45,8 @@ CREATE TABLE IF NOT EXISTS `Suppliers` (
     email VARCHAR(100) UNIQUE,
     phone VARCHAR(20) UNIQUE,
     address TEXT,
-    status ENUM('Active', 'Inactive') DEFAULT 'Active'
+    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+    is_deleted BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS `Ingredients` (
@@ -83,6 +85,7 @@ CREATE TABLE IF NOT EXISTS `InventoryItems` (
     last_restocked_by INT NOT NULL,
     recipe_instructions TEXT,
     status ENUM('Available', 'Unavailable') DEFAULT 'Available',
+    is_deleted BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (category_id) REFERENCES Categories(category_id),
     FOREIGN KEY (last_restocked_by) REFERENCES Employees(employee_id)
 );
@@ -105,7 +108,8 @@ CREATE TABLE IF NOT EXISTS `Customers` (
     first_name VARCHAR(50) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE KEY,
     phonenumber VARCHAR(20) NOT NULL UNIQUE KEY,
-    address VARCHAR(200) NOT NULL
+    address VARCHAR(200) NOT NULL,
+    is_deleted BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS `Orders` (
@@ -117,6 +121,7 @@ CREATE TABLE IF NOT EXISTS `Orders` (
     total_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
     payment_method ENUM('Cash', 'Credit Card') NULL,
     payment_status ENUM('Pending', 'Paid') NOT NULL DEFAULT 'Pending',
+    is_deleted BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
 );
 

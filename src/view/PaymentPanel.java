@@ -9,6 +9,7 @@ import javax.swing.event.DocumentEvent;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.List;
+import javax.swing.ListSelectionModel;
 
 public class PaymentPanel extends JPanel {
     private final RestaurantController controller;
@@ -17,28 +18,83 @@ public class PaymentPanel extends JPanel {
 
     public PaymentPanel(RestaurantController controller) {
         this.controller = controller;
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(10, 10));
         initComponents();
         loadUnpaidOrders();
     }
 
+    private JButton createStyledButton(String text, Color backgroundColor) {
+        JButton button = new JButton(text);
+        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
+        button.setBackground(backgroundColor);
+        button.setForeground(Color.BLACK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+
+        // Add hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(backgroundColor.brighter());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(backgroundColor);
+            }
+        });
+
+        return button;
+    }
+
     private void initComponents() {
-        // Create toolbar
-        JPanel toolBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JButton processButton = new JButton("Process Payment");
+        setLayout(new BorderLayout(10, 10));
+        
+        // Create button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JButton processButton = createStyledButton("Process Payment", new Color(40, 167, 69));
         processButton.addActionListener(e -> processPayment());
-        toolBar.add(processButton);
-        add(toolBar, BorderLayout.NORTH);
+        
+        JButton refreshButton = createStyledButton("Refresh", new Color(70, 130, 180));
+        refreshButton.addActionListener(e -> loadUnpaidOrders());
+        
+        JButton helpButton = createStyledButton("Help", new Color(108, 117, 125));
+        helpButton.addActionListener(e -> showHelpDialog());
+        
+        buttonPanel.add(processButton);
+        buttonPanel.add(refreshButton);
+        buttonPanel.add(helpButton);
+        
+        add(buttonPanel, BorderLayout.NORTH);
 
         // Create orders table
-        String[] columns = {"Order ID", "Customer", "Date", "Type", "Total", "Status"};
+        String[] columns = {
+            "Customer Name", "Order Type", "Order Date", 
+            "Total Amount", "Status"
+        };
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
             }
         };
+        
         ordersTable = new JTable(tableModel);
+        ordersTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        ordersTable.getTableHeader().setReorderingAllowed(false);
+        
+        // Set column widths
+        ordersTable.getColumnModel().getColumn(0).setPreferredWidth(150); // Customer Name
+        ordersTable.getColumnModel().getColumn(1).setPreferredWidth(100); // Order Type
+        ordersTable.getColumnModel().getColumn(2).setPreferredWidth(120); // Order Date
+        ordersTable.getColumnModel().getColumn(3).setPreferredWidth(100); // Total Amount
+        ordersTable.getColumnModel().getColumn(4).setPreferredWidth(80);  // Status
+
         JScrollPane scrollPane = new JScrollPane(ordersTable);
         add(scrollPane, BorderLayout.CENTER);
 
@@ -58,16 +114,15 @@ public class PaymentPanel extends JPanel {
         List<Order> orders = controller.getAllOrders();
         
         for (Order order : orders) {
-            if ("Unpaid".equals(order.getPaymentStatus())) {
+            if ("Pending".equals(order.getPaymentStatus())) {
                 Customer customer = controller.getCustomerById(order.getCustomerId());
                 double total = controller.calculateOrderTotal(order.getOrderId());
                 
                 Object[] row = {
-                    order.getOrderId(),
                     customer.getFirstName() + " " + customer.getLastName(),
-                    order.getOrderDateTime(),
                     order.getOrderType(),
-                    String.format("$%.2f", total),
+                    order.getOrderDateTime(),
+                    String.format("₱%.2f", order.getTotalAmount()),
                     order.getOrderStatus()
                 };
                 tableModel.addRow(row);
@@ -168,41 +223,60 @@ public class PaymentPanel extends JPanel {
         // Create payment dialog
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
             "Process Payment", true);
-        dialog.setLayout(new BorderLayout());
+        dialog.setLayout(new BorderLayout(10, 10));
 
         // Create form panel
-        JPanel formPanel = new JPanel(new GridLayout(0, 2, 5, 5));
-        formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel formPanel = new JPanel(new GridLayout(0, 2, 10, 10));
+        formPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Add total
-        formPanel.add(new JLabel("Total Amount:"));
-        formPanel.add(new JLabel(String.format("$%.2f", total)));
+        // Add order details
+        formPanel.add(new JLabel("Order ID:"));
+        formPanel.add(new JLabel(String.valueOf(orderId)));
+        
+        formPanel.add(new JLabel("Customer:"));
+        formPanel.add(new JLabel((String) tableModel.getValueAt(selectedRow, 1)));
+        
+        formPanel.add(new JLabel("Order Type:"));
+        formPanel.add(new JLabel((String) tableModel.getValueAt(selectedRow, 2)));
+
+        // Add total with bold font
+        JLabel totalLabel = new JLabel("Total Amount:");
+        JLabel totalValueLabel = new JLabel(String.format("$%.2f", total));
+        Font boldFont = totalValueLabel.getFont().deriveFont(Font.BOLD);
+        totalValueLabel.setFont(boldFont);
+        formPanel.add(totalLabel);
+        formPanel.add(totalValueLabel);
 
         // Add payment method selection
         formPanel.add(new JLabel("Payment Method:"));
-        String[] methods = {"Cash", "Credit Card", "Debit Card"};
+        String[] methods = {"Cash", "Credit Card"};
         JComboBox<String> methodCombo = new JComboBox<>(methods);
         formPanel.add(methodCombo);
 
         // Add amount received field (for cash payments)
-        formPanel.add(new JLabel("Amount Received:"));
+        JLabel amountLabel = new JLabel("Amount Received:");
         JTextField amountField = new JTextField();
+        formPanel.add(amountLabel);
         formPanel.add(amountField);
 
         // Add change due field
-        formPanel.add(new JLabel("Change Due:"));
-        JLabel changeLabel = new JLabel("$0.00");
-        formPanel.add(changeLabel);
+        JLabel changeDueLabel = new JLabel("Change Due:");
+        JLabel changeValueLabel = new JLabel("$0.00");
+        changeValueLabel.setFont(boldFont);
+        formPanel.add(changeDueLabel);
+        formPanel.add(changeValueLabel);
 
         // Update change when amount received changes
         amountField.getDocument().addDocumentListener(new DocumentListener() {
             private void updateChange() {
                 try {
-                    double received = Double.parseDouble(amountField.getText());
+                    double received = Double.parseDouble(amountField.getText().trim());
                     double change = received - total;
-                    changeLabel.setText(String.format("$%.2f", Math.max(0, change)));
+                    changeValueLabel.setText(String.format("$%.2f", Math.max(0, change)));
+                    changeValueLabel.setForeground(change >= 0 ? Color.BLACK : Color.RED);
                 } catch (NumberFormatException ex) {
-                    changeLabel.setText("$0.00");
+                    changeValueLabel.setText("$0.00");
+                    changeValueLabel.setForeground(Color.BLACK);
                 }
             }
 
@@ -218,51 +292,75 @@ public class PaymentPanel extends JPanel {
         methodCombo.addActionListener(e -> {
             boolean isCash = "Cash".equals(methodCombo.getSelectedItem());
             amountField.setEnabled(isCash);
+            amountLabel.setEnabled(isCash);
+            changeDueLabel.setEnabled(isCash);
+            changeValueLabel.setEnabled(isCash);
             if (!isCash) {
                 amountField.setText("");
-                changeLabel.setText("$0.00");
+                changeValueLabel.setText("$0.00");
+                changeValueLabel.setForeground(Color.BLACK);
             }
         });
 
-        dialog.add(formPanel, BorderLayout.CENTER);
-
         // Add buttons
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton processButton = new JButton("Process");
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        JButton processButton = new JButton("Process Payment");
         JButton cancelButton = new JButton("Cancel");
 
         processButton.addActionListener(e -> {
             try {
-                double amountReceived = 0.0;
-                if ("Cash".equals(methodCombo.getSelectedItem())) {
-                    amountReceived = Double.parseDouble(amountField.getText());
+                String selectedMethod = (String) methodCombo.getSelectedItem();
+                double amountReceived;
+                
+                if ("Cash".equals(selectedMethod)) {
+                    if (amountField.getText().trim().isEmpty()) {
+                        JOptionPane.showMessageDialog(dialog,
+                            "Please enter the amount received.",
+                            "Missing Amount",
+                            JOptionPane.WARNING_MESSAGE);
+                        return;
+                    }
+                    
+                    amountReceived = Double.parseDouble(amountField.getText().trim());
                     if (amountReceived < total) {
                         JOptionPane.showMessageDialog(dialog,
                             "Insufficient amount received.",
-                            "Error",
-                            JOptionPane.ERROR_MESSAGE);
+                            "Invalid Amount",
+                            JOptionPane.WARNING_MESSAGE);
                         return;
                     }
+                } else {
+                    // For credit card, amount received equals total
+                    amountReceived = total;
                 }
                 
                 // Process the payment
-                if (controller.processPayment(orderId, amountReceived, methodCombo.getSelectedItem().toString())) {
+                if (controller.processPayment(orderId, amountReceived, selectedMethod)) {
                     JOptionPane.showMessageDialog(dialog,
-                        "Payment processed successfully.",
-                        "Success",
+                        String.format("""
+                            Payment processed successfully!
+                            
+                            Order ID: %d
+                            Total Amount: $%.2f
+                            Payment Method: %s%s
+                            """,
+                            orderId,
+                            total,
+                            selectedMethod,
+                            "Cash".equals(selectedMethod) 
+                                ? String.format("\nAmount Received: $%.2f\nChange Due: $%.2f",
+                                    amountReceived,
+                                    amountReceived - total)
+                                : ""),
+                        "Payment Successful",
                         JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     loadUnpaidOrders(); // Refresh the table
-                } else {
-                    JOptionPane.showMessageDialog(dialog,
-                        "Failed to process payment.",
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE);
                 }
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(dialog,
-                    "Invalid amount entered.",
-                    "Error",
+                    "Please enter a valid amount.",
+                    "Invalid Input",
                     JOptionPane.ERROR_MESSAGE);
             }
         });
@@ -271,11 +369,19 @@ public class PaymentPanel extends JPanel {
 
         buttonPanel.add(processButton);
         buttonPanel.add(cancelButton);
+
+        // Add components to dialog
+        dialog.add(formPanel, BorderLayout.CENTER);
         dialog.add(buttonPanel, BorderLayout.SOUTH);
 
         // Show dialog
         dialog.pack();
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
+    }
+
+    private void showHelpDialog() {
+        HelpDialog helpDialog = new HelpDialog(SwingUtilities.getWindowAncestor(this), "Payments");
+        helpDialog.setVisible(true);
     }
 } 

@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import javax.swing.JOptionPane;
 
 public class OrderDAO {
     private IngredientDAO ingredientDAO;
@@ -22,7 +23,7 @@ public class OrderDAO {
 
     public List<Order> getAllOrders() {
         List<Order> orders = new ArrayList<>();
-        String query = "SELECT * FROM Orders ORDER BY order_datetime DESC";
+        String query = "SELECT * FROM Orders WHERE is_deleted = FALSE ORDER BY order_datetime DESC";
         try (Statement stmt = getConnection().createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
@@ -47,7 +48,7 @@ public class OrderDAO {
     }
 
     public Order getOrderById(int orderId) {
-        String query = "SELECT * FROM Orders WHERE order_id = ?";
+        String query = "SELECT * FROM Orders WHERE order_id = ? AND is_deleted = FALSE";
         try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, orderId);
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -378,5 +379,69 @@ public class OrderDAO {
             total += item.getQuantity() * item.getPriceAtTime();
         }
         return total;
+    }
+
+    public boolean deleteOrder(int orderId) {
+        String updateQuery = "UPDATE Orders SET is_deleted = TRUE WHERE order_id = ?";
+        try (PreparedStatement stmt = getConnection().prepareStatement(updateQuery)) {
+            stmt.setInt(1, orderId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public List<Order> getDeletedOrders() {
+        List<Order> orders = new ArrayList<>();
+        String query = "SELECT o.*, c.first_name, c.last_name FROM Orders o " +
+                      "JOIN Customers c ON o.customer_id = c.customer_id " +
+                      "WHERE o.is_deleted = TRUE " +
+                      "ORDER BY o.order_datetime DESC";
+        
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Order order = new Order(
+                    rs.getInt("order_id"),
+                    rs.getInt("customer_id"),
+                    rs.getTimestamp("order_datetime"),
+                    rs.getString("order_type"),
+                    rs.getString("order_status"),
+                    rs.getString("payment_status"),
+                    rs.getDouble("total_amount"),
+                    rs.getString("payment_method")
+                );
+                order.setCustomerName(rs.getString("first_name") + " " + rs.getString("last_name"));
+                orders.add(order);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to fetch deleted orders: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+        return orders;
+    }
+
+    public boolean restoreOrder(int orderId) {
+        String query = "UPDATE Orders SET is_deleted = FALSE WHERE order_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, orderId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to restore order: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
     }
 } 

@@ -24,7 +24,8 @@ src/
 │   ├── OrderItem.java              # Order item entity
 │   └── Supplier.java               # Supplier entity
 ├── util/
-│   └── DatabaseConnection.java     # Database connection utility
+│   ├── DatabaseConnection.java     # Database connection utility
+│   └── DatabaseErrorHandler.java   # Error handling utility
 └── view/
     ├── MainFrame.java              # Main application window
     ├── CustomerPanel.java          # Customer management interface
@@ -33,6 +34,10 @@ src/
     ├── OrderPanel.java             # Order management interface
     ├── RecordsPanel.java           # Records and reporting interface
     └── SupplierPanel.java          # Supplier management interface
+
+sql/
+├── Group8_DB.sql                   # Database schema and sample data
+└── infomdbreal.eerd                # Entity Relationship Diagram
 ```
 
 ## Features
@@ -45,6 +50,7 @@ src/
 - Delete items
 - Track item status (Available/Unavailable)
 - Monitor low stock items
+- Automatic status updates based on quantity
 
 ### Order Management
 - Create new orders
@@ -77,17 +83,40 @@ src/
 - Employee shift reports
 - Profit margin analysis
 
-## Database Schema
+## Database Design
 
-The system uses MySQL with the following main tables:
+The system uses MySQL with a well-structured database design. The Entity Relationship Diagram (ERD) can be found in `sql/infomdbreal.eerd`.
+
+### Main Tables
 - `InventoryItems`: Stores product information
+  - Tracks quantity, prices, and status
+  - Links to categories and employees
+  - Includes recipe instructions
 - `Orders`: Tracks customer orders
+  - Supports multiple order types (Dine-In, Takeout, Delivery)
+  - Tracks payment status and method
+  - Links to customers and employees
 - `Customers`: Stores customer information
+  - Tracks contact details and order history
 - `Employees`: Manages employee data
+  - Assigns roles and shifts
+  - Tracks performance and assignments
 - `Suppliers`: Tracks supplier information
+  - Manages supplier relationships
+  - Tracks contact details and status
 - `Categories`: Product categories
+  - Organizes inventory items
 - `Ingredients`: Raw materials
+  - Tracks stock levels and costs
 - `OrderItems`: Order line items
+  - Links orders to products
+  - Records quantities and prices
+
+### Constraints and Validations
+- Check constraints for prices and quantities
+- Foreign key relationships for data integrity
+- ENUM types for status fields
+- Unique constraints where appropriate
 
 ## Getting Started
 
@@ -103,11 +132,13 @@ The system uses MySQL with the following main tables:
 
 ## Error Handling
 
-The system includes comprehensive error handling for:
+The system includes comprehensive error handling through `DatabaseErrorHandler.java`:
 - Database constraints
 - Invalid input validation
 - Business logic violations
 - Connection issues
+- User-friendly error messages
+- Proper exception propagation
 
 ## Contributing
 
@@ -120,3 +151,36 @@ The system includes comprehensive error handling for:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Future Improvements
+
+### 1. Restock History Tracking
+- Implement a dedicated `RestockHistory` table to track:
+  - Complete history of all restocking events
+  - Previous quantities and changes
+  - Timestamps of all restocks
+  - Employee responsible for each restock
+  - Notes and reasons for restocking
+- Benefits:
+  - Better audit trails
+  - Inventory movement analysis
+  - Employee performance tracking
+  - Seasonal trend identification
+  - More accurate reporting
+
+### 2. Additional Feature Ideas
+- Advanced reporting and analytics
+- Inventory forecasting
+- Employee scheduling optimization
+- Customer loyalty program
+- Mobile application support
+
+## Current Implementation
+
+The current system tracks the most recent restock through:
+- `last_restock` timestamp in `InventoryItems`
+- `last_restocked_by` employee reference
+- Current quantity tracking
+- Status updates (Available/Unavailable)
+
+This provides basic inventory management while maintaining simplicity and staying within the current database specifications.

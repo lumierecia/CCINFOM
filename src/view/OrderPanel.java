@@ -36,36 +36,89 @@ public class OrderPanel extends JPanel {
         JPanel categoryPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         categoryPanel.add(new JLabel("Category:"));
         categoryCombo = new JComboBox<>(controller.getAllCategories().toArray(new String[0]));
+        categoryCombo.setToolTipText("<html>Select a food category to filter available items</html>");
         categoryCombo.addActionListener(e -> updateProductCombo());
         categoryPanel.add(categoryCombo);
+
+        // Add help button for category selection
+        JButton categoryHelpBtn = createHelpButton("""
+            Category Selection:
+            • Choose a category to filter the menu items
+            • This helps you find items more quickly
+            • The product list will update automatically
+            """);
+        categoryPanel.add(categoryHelpBtn);
 
         // Setup product selection
         JPanel productPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         productPanel.add(new JLabel("Product:"));
         productCombo = new JComboBox<>();
+        productCombo.setToolTipText("<html>Select the menu item to add to the order</html>");
         updateProductCombo();
         productPanel.add(productCombo);
+
+        // Add help button for product selection
+        JButton productHelpBtn = createHelpButton("""
+            Product Selection:
+            • Choose the item you want to order
+            • Only available items are shown
+            • Price and stock are automatically tracked
+            """);
+        productPanel.add(productHelpBtn);
 
         // Setup quantity selection
         JPanel quantityPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         quantityPanel.add(new JLabel("Quantity:"));
         quantitySpinner = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+        quantitySpinner.setToolTipText("<html>Set how many of this item to order</html>");
         quantityPanel.add(quantitySpinner);
 
-        // Add item button
-        JButton addButton = new JButton("Add to Order");
+        // Add help button for quantity
+        JButton quantityHelpBtn = createHelpButton("""
+            Quantity Selection:
+            • Choose how many items to order
+            • Cannot exceed available stock
+            • Minimum is 1, maximum is 100
+            """);
+        quantityPanel.add(quantityHelpBtn);
+
+        // Create action buttons with consistent styling
+        JButton addButton = createStyledButton("Add to Order", new Color(40, 167, 69));
         addButton.addActionListener(e -> addItemToOrder());
+
+        JButton removeButton = createStyledButton("Remove Item", new Color(220, 53, 69));
+        removeButton.addActionListener(e -> removeSelectedItem());
+
+        JButton clearButton = createStyledButton("Clear All", new Color(255, 193, 7));
+        clearButton.addActionListener(e -> clearOrder());
+
+        JButton placeOrderButton = createStyledButton("Place Order", new Color(70, 130, 180));
+        placeOrderButton.addActionListener(e -> placeOrder());
+
+        JButton helpButton = createStyledButton("Help", new Color(108, 117, 125));
+        helpButton.addActionListener(e -> showHelp());
+
+        // Add buttons to panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+        buttonPanel.add(addButton);
+        buttonPanel.add(removeButton);
+        buttonPanel.add(clearButton);
+        buttonPanel.add(placeOrderButton);
+        buttonPanel.add(helpButton);
 
         // Combine top components
         topPanel.add(categoryPanel, BorderLayout.WEST);
         topPanel.add(productPanel, BorderLayout.CENTER);
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         rightPanel.add(quantityPanel);
-        rightPanel.add(addButton);
+        rightPanel.add(buttonPanel);
         topPanel.add(rightPanel, BorderLayout.EAST);
 
-        // Setup order items table
-        String[] columns = {"Product", "Quantity", "Unit Price", "Subtotal"};
+        // Setup order items table with tooltip
+        String[] columns = {
+            "Product Name", "Category", "Quantity", 
+            "Unit Price", "Total"
+        };
         itemsModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -73,29 +126,37 @@ public class OrderPanel extends JPanel {
             }
         };
         orderItemsTable = new JTable(itemsModel);
+        orderItemsTable.setToolTipText("<html>List of items in your current order</html>");
+        orderItemsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        orderItemsTable.getTableHeader().setReorderingAllowed(false);
+        
+        // Set column widths
+        orderItemsTable.getColumnModel().getColumn(0).setPreferredWidth(200); // Product Name
+        orderItemsTable.getColumnModel().getColumn(1).setPreferredWidth(100); // Category
+        orderItemsTable.getColumnModel().getColumn(2).setPreferredWidth(80);  // Quantity
+        orderItemsTable.getColumnModel().getColumn(3).setPreferredWidth(100); // Unit Price
+        orderItemsTable.getColumnModel().getColumn(4).setPreferredWidth(100); // Total
+
         JScrollPane scrollPane = new JScrollPane(orderItemsTable);
         centerPanel.add(scrollPane, BorderLayout.CENTER);
+
+        // Add help button for order table
+        JButton tableHelpBtn = createHelpButton("""
+            Order Table:
+            • Shows all items in your current order
+            • Displays quantity and prices
+            • Select an row to remove item
+            • Subtotals are calculated automatically
+            """);
+        centerPanel.add(tableHelpBtn, BorderLayout.NORTH);
 
         // Setup bottom panel with total and buttons
         JPanel totalPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         totalLabel = new JLabel("Total: $0.00");
         totalPanel.add(totalLabel);
 
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton removeButton = new JButton("Remove Selected");
-        removeButton.addActionListener(e -> removeSelectedItem());
-        JButton clearButton = new JButton("Clear All");
-        clearButton.addActionListener(e -> clearOrder());
-        JButton placeOrderButton = new JButton("Place Order");
-        placeOrderButton.addActionListener(e -> placeOrder());
-
-        buttonPanel.add(removeButton);
-        buttonPanel.add(clearButton);
-        buttonPanel.add(placeOrderButton);
-
         bottomPanel.add(totalPanel, BorderLayout.CENTER);
-        bottomPanel.add(buttonPanel, BorderLayout.EAST);
-
+        
         // Add all panels to main panel
         add(topPanel, BorderLayout.NORTH);
         add(centerPanel, BorderLayout.CENTER);
@@ -137,7 +198,7 @@ public class OrderPanel extends JPanel {
         // Check if product already exists in order
         for (int i = 0; i < itemsModel.getRowCount(); i++) {
             if (itemsModel.getValueAt(i, 0).equals(product.getProductName())) {
-                int currentQty = (int) itemsModel.getValueAt(i, 1);
+                int currentQty = (int) itemsModel.getValueAt(i, 2);
                 if (currentQty + quantity > product.getQuantity()) {
                     JOptionPane.showMessageDialog(this,
                         "Not enough stock available.",
@@ -145,9 +206,9 @@ public class OrderPanel extends JPanel {
                         JOptionPane.WARNING_MESSAGE);
                     return;
                 }
-                itemsModel.setValueAt(currentQty + quantity, i, 1);
+                itemsModel.setValueAt(currentQty + quantity, i, 2);
                 double subtotal = (currentQty + quantity) * product.getSellPrice();
-                itemsModel.setValueAt(String.format("$%.2f", subtotal), i, 3);
+                itemsModel.setValueAt(String.format("₱%.2f", subtotal), i, 4);
                 updateTotal();
                 return;
             }
@@ -157,9 +218,10 @@ public class OrderPanel extends JPanel {
         double subtotal = quantity * product.getSellPrice();
         Object[] row = {
             product.getProductName(),
+            product.getCategoryName(),
             quantity,
-            String.format("$%.2f", product.getSellPrice()),
-            String.format("$%.2f", subtotal)
+            String.format("₱%.2f", product.getSellPrice()),
+            String.format("₱%.2f", product.getSellPrice() * quantity)
         };
         itemsModel.addRow(row);
 
@@ -356,5 +418,61 @@ public class OrderPanel extends JPanel {
             return selectedIds;
         }
         return null;
+    }
+
+    private JButton createHelpButton(String helpText) {
+        JButton helpBtn = new JButton("?");
+        helpBtn.setFont(new Font(helpBtn.getFont().getName(), Font.BOLD, 10));
+        helpBtn.setMargin(new Insets(1, 4, 1, 4));
+        helpBtn.setToolTipText("Click for help");
+        helpBtn.addActionListener(e -> {
+            JTextArea textArea = new JTextArea(helpText);
+            textArea.setEditable(false);
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
+            textArea.setMargin(new Insets(10, 10, 10, 10));
+            textArea.setBackground(new Color(252, 252, 252));
+            
+            JScrollPane scrollPane = new JScrollPane(textArea);
+            scrollPane.setPreferredSize(new Dimension(300, 200));
+            
+            JOptionPane.showMessageDialog(this,
+                scrollPane,
+                "Help",
+                JOptionPane.INFORMATION_MESSAGE);
+        });
+        return helpBtn;
+    }
+
+    private JButton createStyledButton(String text, Color backgroundColor) {
+        JButton button = new JButton(text);
+        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
+        button.setBackground(backgroundColor);
+        button.setForeground(Color.BLACK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+
+        // Add hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(backgroundColor.brighter());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(backgroundColor);
+            }
+        });
+
+        return button;
+    }
+
+    private void showHelp() {
+        HelpDialog helpDialog = new HelpDialog(SwingUtilities.getWindowAncestor(this), "Orders");
+        helpDialog.setVisible(true);
     }
 } 

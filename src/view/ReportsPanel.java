@@ -157,7 +157,7 @@ public class ReportsPanel extends JPanel {
     }
 
     private void setupEmployeeShiftsReport() {
-        String[] columns = {"Employee ID", "First Name", "Last Name", "Total Shifts", "Total Hours"};
+        String[] columns = {"First Name", "Last Name", "Total Shifts", "Total Hours"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -169,7 +169,7 @@ public class ReportsPanel extends JPanel {
     }
 
     private void setupProfitMarginReport() {
-        String[] columns = {"Product ID", "Order ID", "Order Date", "Total Orders", "Total Quantity", "Revenue", "Cost", "Profit"};
+        String[] columns = {"Order Date", "Total Orders", "Total Quantity", "Revenue", "Cost", "Profit"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {

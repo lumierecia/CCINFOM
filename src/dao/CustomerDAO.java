@@ -14,7 +14,7 @@ public class CustomerDAO {
     }
 
     public Customer getCustomerById(int customerId) {
-        String query = "SELECT * FROM Customers WHERE customer_id = ?";
+        String query = "SELECT * FROM Customers WHERE customer_id = ? AND is_deleted = FALSE";
         
         try (Connection conn = getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -44,7 +44,7 @@ public class CustomerDAO {
 
     public List<Customer> getAllCustomers() {
         List<Customer> customers = new ArrayList<>();
-        String query = "SELECT * FROM Customers";
+        String query = "SELECT * FROM Customers WHERE is_deleted = FALSE";
         
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement();
@@ -128,7 +128,7 @@ public class CustomerDAO {
 
     public boolean deleteCustomer(int customerId) {
         // First check if customer has any orders
-        String checkQuery = "SELECT COUNT(*) FROM Orders WHERE customer_id = ?";
+        String checkQuery = "SELECT COUNT(*) FROM Orders WHERE customer_id = ? AND is_deleted = FALSE";
         
         try (Connection conn = getConnection();
              PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
@@ -144,11 +144,11 @@ public class CustomerDAO {
                 }
             }
             
-            // If no orders, proceed with deletion
-            String deleteQuery = "DELETE FROM Customers WHERE customer_id = ?";
-            try (PreparedStatement deleteStmt = conn.prepareStatement(deleteQuery)) {
-                deleteStmt.setInt(1, customerId);
-                return deleteStmt.executeUpdate() > 0;
+            // If no orders, proceed with soft delete
+            String updateQuery = "UPDATE Customers SET is_deleted = TRUE WHERE customer_id = ?";
+            try (PreparedStatement updateStmt = conn.prepareStatement(updateQuery)) {
+                updateStmt.setInt(1, customerId);
+                return updateStmt.executeUpdate() > 0;
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -162,7 +162,8 @@ public class CustomerDAO {
 
     public List<Customer> searchCustomers(String searchTerm) {
         List<Customer> customers = new ArrayList<>();
-        String query = "SELECT * FROM Customers WHERE first_name LIKE ? OR last_name LIKE ? OR email LIKE ? " +
+        String query = "SELECT * FROM Customers WHERE is_deleted = FALSE AND " +
+                      "(first_name LIKE ? OR last_name LIKE ? OR email LIKE ?) " +
                       "ORDER BY last_name, first_name";
         
         try (Connection conn = getConnection();
@@ -198,7 +199,7 @@ public class CustomerDAO {
 
     public List<Order> getCustomerOrders(int customerId) {
         List<Order> orders = new ArrayList<>();
-        String query = "SELECT * FROM Orders WHERE customer_id = ? ORDER BY order_datetime DESC";
+        String query = "SELECT * FROM Orders WHERE customer_id = ? AND is_deleted = FALSE ORDER BY order_datetime DESC";
         try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, customerId);
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -220,5 +221,52 @@ public class CustomerDAO {
             e.printStackTrace();
         }
         return orders;
+    }
+
+    public List<Customer> getDeletedCustomers() {
+        List<Customer> customers = new ArrayList<>();
+        String query = "SELECT * FROM Customers WHERE is_deleted = TRUE";
+        
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Customer customer = new Customer(
+                    rs.getInt("customer_id"),
+                    rs.getString("first_name"),
+                    rs.getString("last_name"),
+                    rs.getString("email"),
+                    rs.getString("phonenumber"),
+                    rs.getString("address")
+                );
+                customers.add(customer);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to fetch deleted customers: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+        return customers;
+    }
+
+    public boolean restoreCustomer(int customerId) {
+        String query = "UPDATE Customers SET is_deleted = FALSE WHERE customer_id = ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, customerId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to restore customer: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
     }
 } 
