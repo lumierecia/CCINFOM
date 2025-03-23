@@ -26,14 +26,22 @@ src/
 ├── util/
 │   ├── DatabaseConnection.java     # Database connection utility
 │   └── DatabaseErrorHandler.java   # Error handling utility
+├── icons/                          # Application icons and images
 └── view/
     ├── MainFrame.java              # Main application window
     ├── CustomerPanel.java          # Customer management interface
     ├── EmployeePanel.java          # Employee management interface
     ├── InventoryPanel.java         # Inventory management interface
     ├── OrderPanel.java             # Order management interface
+    ├── OrderHistoryPanel.java      # Order history interface
+    ├── PaymentPanel.java           # Payment processing interface
     ├── RecordsPanel.java           # Records and reporting interface
-    └── SupplierPanel.java          # Supplier management interface
+    ├── ReportsPanel.java           # Reports generation interface
+    ├── ShiftManagementPanel.java   # Employee shift management
+    ├── SupplierPanel.java          # Supplier management interface
+    ├── TransactionsPanel.java      # Transaction history interface
+    ├── DeletedRecordsPanel.java    # Deleted records management
+    └── HelpDialog.java             # Help documentation interface
 
 sql/
 ├── Group8_DB.sql                   # Database schema and sample data
@@ -58,30 +66,63 @@ sql/
 - Process payments
 - Assign employees to orders
 - View order history
+- Track payment status and methods
+- Generate order receipts
 
 ### Customer Management
 - Add new customers
 - Update customer information
 - View customer history
 - Track customer orders
+- Soft delete customer records
+- Restore deleted customer data
 
 ### Employee Management
 - Add new employees
 - Assign roles and shifts
 - Track employee schedules
 - Monitor employee performance
+- Manage employee shifts
+- Track employee attendance
+- Soft delete employee records
+- Restore deleted employee data
 
 ### Supplier Management
 - Add new suppliers
 - Track supplier information
 - Manage supplier relationships
 - Monitor ingredient supplies
+- Soft delete supplier records
+- Restore deleted supplier data
+
+### Payment Processing
+- Process multiple payment methods
+- Track transaction history
+- Generate payment receipts
+- Handle refunds and adjustments
+- Monitor payment status
 
 ### Reporting
 - Sales reports
 - Customer order reports
 - Employee shift reports
 - Profit margin analysis
+- Transaction history reports
+- Deleted records reports
+- Custom report generation
+
+### Data Management
+- Soft deletion for all major entities
+- Deleted records management
+- Data restoration capabilities
+- Comprehensive audit trail
+- Backup and recovery options
+
+### Help and Documentation
+- Built-in help system
+- User documentation
+- System guides
+- Troubleshooting assistance
 
 ## Database Design
 
