@@ -3,6 +3,7 @@ package model;
 public class OrderItem {
     private int orderId;
     private int productId;
+    private String productName;
     private int quantity;
     private double priceAtTime;
 
@@ -12,6 +13,14 @@ public class OrderItem {
         this.productId = 0;
         this.quantity = 0;
         this.priceAtTime = 0.0;
+    }
+
+    public OrderItem(int orderId, int productId, String productName, int quantity, double priceAtTime) {
+        this.orderId = orderId;
+        this.productId = productId;
+        this.productName = productName;
+        this.quantity = quantity;
+        this.priceAtTime = priceAtTime;
     }
 
     public OrderItem(int orderId, int productId, int quantity, double priceAtTime) {
@@ -36,6 +45,14 @@ public class OrderItem {
 
     public void setProductId(int productId) {
         this.productId = productId;
+    }
+
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = productName;
     }
 
     public int getQuantity() {

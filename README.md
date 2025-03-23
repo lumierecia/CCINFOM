@@ -123,7 +123,9 @@ The system uses MySQL with a well-structured database design. The Entity Relatio
 1. Ensure you have Java 17 or later installed
 2. Set up MySQL database
 3. Run the `Group8_DB.sql` script to create the database schema
+
 4. Update database connection details in `DatabaseConnection.java` (change the password!!)
+
 5. Compile and run the application:
    ```bash
    javac src/view/MainFrame.java
@@ -139,4 +141,3 @@ The system includes comprehensive error handling through `DatabaseErrorHandler.j
 - Connection issues
 - User-friendly error messages
 - Proper exception propagation
-

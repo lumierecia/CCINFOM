@@ -2,11 +2,13 @@ package model;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class Order {
     private int orderId;
     private int customerId;
+    private String customerName;
     private Timestamp orderDateTime;
     private String orderType;
     private String orderStatus;
@@ -22,7 +24,23 @@ public class Order {
         this.totalAmount = 0.0;
     }
 
-    public Order(int orderId, int customerId, Timestamp orderDateTime, String orderType, 
+    public Order(int orderId, int customerId, String customerName, String orderType, 
+                String orderStatus, Date orderDateTime, double totalAmount, 
+                String paymentMethod, String paymentStatus) {
+        this.orderId = orderId;
+        this.customerId = customerId;
+        this.customerName = customerName;
+        this.orderType = orderType;
+        this.orderStatus = orderStatus;
+        this.orderDateTime = new Timestamp(orderDateTime.getTime());
+        this.totalAmount = totalAmount;
+        this.paymentMethod = paymentMethod;
+        this.paymentStatus = paymentStatus;
+        this.items = new ArrayList<>();
+        this.assignedEmployees = new ArrayList<>();
+    }
+
+    public Order(int orderId, int customerId, Timestamp orderDateTime, String orderType,
                 String orderStatus, String paymentStatus, double totalAmount, String paymentMethod) {
         this.orderId = orderId;
         this.customerId = customerId;
@@ -51,6 +69,14 @@ public class Order {
 
     public void setCustomerId(int customerId) {
         this.customerId = customerId;
+    }
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
     }
 
     public Timestamp getOrderDateTime() {

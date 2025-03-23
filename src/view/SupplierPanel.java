@@ -6,7 +6,10 @@ import model.Inventory;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.List;
+import java.util.ArrayList;
 
 public class SupplierPanel extends JPanel {
     private JTable supplierTable;
@@ -17,6 +20,7 @@ public class SupplierPanel extends JPanel {
     private JButton deleteButton;
     private JButton viewIngredientsButton;
     private JButton refreshButton;
+    private List<Integer> supplierIds = new ArrayList<>();
 
     public SupplierPanel(RestaurantController controller) {
         this.controller = controller;
@@ -28,11 +32,11 @@ public class SupplierPanel extends JPanel {
     private void initComponents() {
         // Create toolbar
         JPanel toolBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        addButton = new JButton("Add Supplier");
-        editButton = new JButton("Edit Supplier");
-        deleteButton = new JButton("Delete Supplier");
-        viewIngredientsButton = new JButton("View Ingredients");
-        refreshButton = new JButton("Refresh");
+        addButton = createStyledButton("Add Supplier", new Color(40, 167, 69));
+        editButton = createStyledButton("Edit Supplier", new Color(255, 193, 7));
+        deleteButton = createStyledButton("Delete Supplier", new Color(220, 53, 69));
+        viewIngredientsButton = createStyledButton("View Ingredients", new Color(70, 130, 180));
+        refreshButton = createStyledButton("Refresh", new Color(108, 117, 125));
 
         toolBar.add(addButton);
         toolBar.add(editButton);
@@ -41,7 +45,7 @@ public class SupplierPanel extends JPanel {
         toolBar.add(refreshButton);
 
         // Create table
-        String[] columnNames = {"ID", "Name", "Contact Person", "Email", "Phone", "Address", "Status"};
+        String[] columnNames = {"Name", "Contact Person", "Email", "Phone", "Address", "Status"};
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -60,7 +64,7 @@ public class SupplierPanel extends JPanel {
         editButton.addActionListener(e -> {
             int selectedRow = supplierTable.getSelectedRow();
             if (selectedRow != -1) {
-                int supplierId = (int) tableModel.getValueAt(selectedRow, 0);
+                int supplierId = supplierIds.get(selectedRow);
                 Supplier supplier = controller.getSupplierById(supplierId);
                 if (supplier != null) {
                     showSupplierDialog(supplier);
@@ -75,7 +79,7 @@ public class SupplierPanel extends JPanel {
         deleteButton.addActionListener(e -> {
             int selectedRow = supplierTable.getSelectedRow();
             if (selectedRow != -1) {
-                int supplierId = (int) tableModel.getValueAt(selectedRow, 0);
+                int supplierId = supplierIds.get(selectedRow);
                 int confirm = JOptionPane.showConfirmDialog(this,
                     "Are you sure you want to delete this supplier?",
                     "Confirm Delete",
@@ -100,7 +104,7 @@ public class SupplierPanel extends JPanel {
         viewIngredientsButton.addActionListener(e -> {
             int selectedRow = supplierTable.getSelectedRow();
             if (selectedRow != -1) {
-                int supplierId = (int) tableModel.getValueAt(selectedRow, 0);
+                int supplierId = supplierIds.get(selectedRow);
                 showSupplierIngredients(supplierId);
             } else {
                 JOptionPane.showMessageDialog(this,
@@ -114,10 +118,11 @@ public class SupplierPanel extends JPanel {
 
     private void loadSuppliers() {
         tableModel.setRowCount(0);
+        supplierIds.clear();
         List<Supplier> suppliers = controller.getAllSuppliers();
         for (Supplier supplier : suppliers) {
+            supplierIds.add(supplier.getSupplierId());
             Object[] row = {
-                supplier.getSupplierId(),
                 supplier.getName(),
                 supplier.getContactPerson(),
                 supplier.getEmail(),
@@ -261,7 +266,7 @@ public class SupplierPanel extends JPanel {
         dialog.setLayout(new BorderLayout());
 
         // Create table
-        String[] columnNames = {"ID", "Name", "Category", "Quantity", "Unit Price"};
+        String[] columnNames = {"Name", "Category", "Quantity", "Unit Price"};
         DefaultTableModel productsTableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -275,7 +280,6 @@ public class SupplierPanel extends JPanel {
         List<Inventory> products = controller.getSupplierIngredients(supplierId);
         for (Inventory product : products) {
             Object[] row = {
-                product.getProductId(),
                 product.getProductName(),
                 product.getCategoryId(),
                 product.getQuantity(),
@@ -298,5 +302,32 @@ public class SupplierPanel extends JPanel {
         dialog.setSize(600, 400);
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
+    }
+
+    private JButton createStyledButton(String text, Color backgroundColor) {
+        JButton button = new JButton(text);
+        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
+        button.setBackground(backgroundColor);
+        button.setForeground(Color.BLACK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+
+        // Add hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(backgroundColor.brighter());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(backgroundColor);
+            }
+        });
+
+        return button;
     }
 } 
