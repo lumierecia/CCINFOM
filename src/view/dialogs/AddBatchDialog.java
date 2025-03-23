@@ -5,190 +5,160 @@ import model.Ingredient;
 import model.Supplier;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.util.Date;
 import java.util.Calendar;
-import java.util.List;
 
 public class AddBatchDialog extends JDialog {
     private final RestaurantController controller;
-    private JComboBox<Ingredient> ingredientCombo;
-    private JComboBox<Supplier> supplierCombo;
+    private final Ingredient ingredient;
     private JSpinner quantitySpinner;
     private JSpinner purchaseDateSpinner;
     private JSpinner expiryDateSpinner;
-    private boolean confirmed = false;
+    private JComboBox<Supplier> supplierCombo;
+    private JTextField priceField;
+    private boolean success = false;
 
-    public AddBatchDialog(Frame parent, RestaurantController controller) {
-        super(parent, "Add New Batch", true);
+    public AddBatchDialog(Frame owner, Ingredient ingredient, RestaurantController controller) {
+        super(owner, "Add Batch for " + ingredient.getName(), true);
         this.controller = controller;
-        
-        // Set up dialog
-        setLayout(new BorderLayout(10, 10));
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-        
-        // Initialize components
+        this.ingredient = ingredient;
         initComponents();
-        
-        // Pack and center
-        pack();
-        setLocationRelativeTo(parent);
     }
 
     private void initComponents() {
-        // Create main panel with GridBagLayout
-        JPanel mainPanel = new JPanel(new GridBagLayout());
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridwidth = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(5, 5, 5, 5);
-
-        // Ingredient selection
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        mainPanel.add(new JLabel("Ingredient:"), gbc);
+        setLayout(new BorderLayout(10, 10));
         
-        gbc.gridx = 1;
-        List<Ingredient> ingredients = controller.getAllIngredients();
-        ingredientCombo = new JComboBox<>(ingredients.toArray(new Ingredient[0]));
-        mainPanel.add(ingredientCombo, gbc);
-
-        // Supplier selection
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        mainPanel.add(new JLabel("Supplier:"), gbc);
+        // Create input panel
+        JPanel inputPanel = new JPanel(new GridLayout(0, 2, 5, 5));
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        gbc.gridx = 1;
-        List<Supplier> suppliers = controller.getAllSuppliers();
-        supplierCombo = new JComboBox<>(suppliers.toArray(new Supplier[0]));
-        mainPanel.add(supplierCombo, gbc);
-
-        // Quantity spinner
-        gbc.gridx = 0;
-        gbc.gridy = 2;
-        mainPanel.add(new JLabel("Quantity:"), gbc);
+        // Quantity input
+        inputPanel.add(new JLabel("Quantity (" + ingredient.getUnitName() + "):"));
+        quantitySpinner = new JSpinner(new SpinnerNumberModel(1.0, 0.1, 10000.0, 0.1));
+        inputPanel.add(quantitySpinner);
         
-        gbc.gridx = 1;
-        SpinnerNumberModel quantityModel = new SpinnerNumberModel(1.0, 0.1, 10000.0, 0.1);
-        quantitySpinner = new JSpinner(quantityModel);
-        mainPanel.add(quantitySpinner, gbc);
-
-        // Purchase date
-        gbc.gridx = 0;
-        gbc.gridy = 3;
-        mainPanel.add(new JLabel("Purchase Date:"), gbc);
-        
-        gbc.gridx = 1;
+        // Purchase date input
+        inputPanel.add(new JLabel("Purchase Date:"));
         Calendar calendar = Calendar.getInstance();
         Date initDate = calendar.getTime();
-        calendar.add(Calendar.YEAR, -1);
+        calendar.add(Calendar.YEAR, -100);
         Date earliestDate = calendar.getTime();
-        calendar.add(Calendar.YEAR, 2);
+        calendar.add(Calendar.YEAR, 200);
         Date latestDate = calendar.getTime();
         SpinnerDateModel purchaseDateModel = new SpinnerDateModel(initDate, earliestDate, latestDate, Calendar.DAY_OF_MONTH);
         purchaseDateSpinner = new JSpinner(purchaseDateModel);
         purchaseDateSpinner.setEditor(new JSpinner.DateEditor(purchaseDateSpinner, "yyyy-MM-dd"));
-        mainPanel.add(purchaseDateSpinner, gbc);
-
-        // Expiry date
-        gbc.gridx = 0;
-        gbc.gridy = 4;
-        mainPanel.add(new JLabel("Expiry Date:"), gbc);
+        inputPanel.add(purchaseDateSpinner);
         
-        gbc.gridx = 1;
+        // Expiry date input
+        inputPanel.add(new JLabel("Expiry Date:"));
         calendar = Calendar.getInstance();
         calendar.add(Calendar.MONTH, 1); // Default expiry is one month from now
         initDate = calendar.getTime();
-        calendar.add(Calendar.YEAR, -1);
+        calendar.add(Calendar.YEAR, -100);
         earliestDate = calendar.getTime();
-        calendar.add(Calendar.YEAR, 5);
+        calendar.add(Calendar.YEAR, 200);
         latestDate = calendar.getTime();
         SpinnerDateModel expiryDateModel = new SpinnerDateModel(initDate, earliestDate, latestDate, Calendar.DAY_OF_MONTH);
         expiryDateSpinner = new JSpinner(expiryDateModel);
         expiryDateSpinner.setEditor(new JSpinner.DateEditor(expiryDateSpinner, "yyyy-MM-dd"));
-        mainPanel.add(expiryDateSpinner, gbc);
-
-        // Add main panel
-        add(mainPanel, BorderLayout.CENTER);
-
-        // Add buttons
+        inputPanel.add(expiryDateSpinner);
+        
+        // Supplier selection
+        inputPanel.add(new JLabel("Supplier:"));
+        supplierCombo = new JComboBox<>();
+        for (Supplier supplier : controller.getAllSuppliers()) {
+            if (!supplier.isDeleted()) {
+                supplierCombo.addItem(supplier);
+            }
+        }
+        inputPanel.add(supplierCombo);
+        
+        // Price input
+        inputPanel.add(new JLabel("Purchase Price:"));
+        priceField = new JTextField();
+        inputPanel.add(priceField);
+        
+        // Add input panel
+        add(inputPanel, BorderLayout.CENTER);
+        
+        // Create button panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton addButton = new JButton("Add");
+        JButton okButton = new JButton("OK");
         JButton cancelButton = new JButton("Cancel");
-
-        addButton.addActionListener(e -> {
+        
+        okButton.addActionListener(e -> {
             if (validateInput()) {
-                confirmed = true;
+                success = true;
                 dispose();
             }
         });
-
+        
         cancelButton.addActionListener(e -> dispose());
-
-        buttonPanel.add(addButton);
+        
+        buttonPanel.add(okButton);
         buttonPanel.add(cancelButton);
         add(buttonPanel, BorderLayout.SOUTH);
-
-        // Set default button
-        getRootPane().setDefaultButton(addButton);
-
-        // Add window listener
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                confirmed = false;
-                dispose();
-            }
-        });
+        
+        // Set dialog properties
+        pack();
+        setLocationRelativeTo(getOwner());
     }
 
     private boolean validateInput() {
-        if (ingredientCombo.getSelectedItem() == null) {
+        // Validate quantity
+        double quantity = (Double) quantitySpinner.getValue();
+        if (quantity <= 0) {
             JOptionPane.showMessageDialog(this,
-                "Please select an ingredient.",
-                "Validation Error",
+                "Quantity must be greater than 0",
+                "Invalid Input",
                 JOptionPane.ERROR_MESSAGE);
             return false;
         }
-
-        if (supplierCombo.getSelectedItem() == null) {
-            JOptionPane.showMessageDialog(this,
-                "Please select a supplier.",
-                "Validation Error",
-                JOptionPane.ERROR_MESSAGE);
-            return false;
-        }
-
+        
+        // Validate dates
         Date purchaseDate = (Date) purchaseDateSpinner.getValue();
         Date expiryDate = (Date) expiryDateSpinner.getValue();
-
         if (expiryDate.before(purchaseDate)) {
             JOptionPane.showMessageDialog(this,
-                "Expiry date cannot be before purchase date.",
-                "Validation Error",
+                "Expiry date must be after purchase date",
+                "Invalid Input",
                 JOptionPane.ERROR_MESSAGE);
             return false;
         }
-
+        
+        // Validate supplier
+        if (supplierCombo.getSelectedItem() == null) {
+            JOptionPane.showMessageDialog(this,
+                "Please select a supplier",
+                "Invalid Input",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        
+        // Validate price
+        try {
+            double price = Double.parseDouble(priceField.getText());
+            if (price <= 0) {
+                throw new NumberFormatException();
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this,
+                "Please enter a valid price",
+                "Invalid Input",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        
         return true;
     }
 
-    public boolean isConfirmed() {
-        return confirmed;
-    }
-
-    public Ingredient getSelectedIngredient() {
-        return (Ingredient) ingredientCombo.getSelectedItem();
-    }
-
-    public Supplier getSelectedSupplier() {
-        return (Supplier) supplierCombo.getSelectedItem();
+    public boolean isSuccess() {
+        return success;
     }
 
     public double getQuantity() {
-        return ((Number) quantitySpinner.getValue()).doubleValue();
+        return (Double) quantitySpinner.getValue();
     }
 
     public Date getPurchaseDate() {
@@ -197,5 +167,13 @@ public class AddBatchDialog extends JDialog {
 
     public Date getExpiryDate() {
         return (Date) expiryDateSpinner.getValue();
+    }
+
+    public Supplier getSelectedSupplier() {
+        return (Supplier) supplierCombo.getSelectedItem();
+    }
+
+    public double getPurchasePrice() {
+        return Double.parseDouble(priceField.getText());
     }
 } 

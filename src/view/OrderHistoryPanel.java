@@ -4,13 +4,21 @@ import controller.RestaurantController;
 import model.Order;
 import model.OrderItem;
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.table.*;
 import java.awt.*;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
+import java.awt.event.*;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import model.Dish;
+import model.Ingredient;
+
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumn;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class OrderHistoryPanel extends JPanel {
     private JTable orderTable;
@@ -150,17 +158,44 @@ public class OrderHistoryPanel extends JPanel {
         infoPanel.add(new JLabel("Total Amount:"));
         infoPanel.add(new JLabel(String.format("₱%.2f", order.getTotalAmount())));
 
-        // Create items table
-        String[] columnNames = {"Item", "Quantity", "Price", "Total"};
-        DefaultTableModel itemsModel = new DefaultTableModel(columnNames, 0);
+        // Create items table with ingredients button
+        String[] columnNames = {"Item", "Quantity", "Price", "Total", ""};
+        DefaultTableModel itemsModel = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
         JTable itemsTable = new JTable(itemsModel);
+
+        // Create a button column for viewing ingredients
+        itemsTable.getColumnModel().getColumn(4).setCellRenderer(new ButtonRenderer("View Ingredients"));
+        itemsTable.getColumnModel().getColumn(4).setCellEditor(new ButtonEditor(new JCheckBox()));
+
+        // Add mouse listener for ingredient button clicks
+        itemsTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int column = itemsTable.getColumnModel().getColumnIndexAtX(e.getX());
+                int row = e.getY() / itemsTable.getRowHeight();
+
+                if (row < itemsTable.getRowCount() && row >= 0 && 
+                    column < itemsTable.getColumnCount() && column >= 0) {
+                    if (column == 4) {  // Ingredients button column
+                        OrderItem item = order.getItems().get(row);
+                        showIngredientDetailsDialog(item);
+                    }
+                }
+            }
+        });
 
         for (OrderItem item : order.getItems()) {
             Object[] row = {
-                item.getProductName(),
+                item.getDishName(),
                 item.getQuantity(),
                 String.format("₱%.2f", item.getPriceAtTime()),
-                String.format("₱%.2f", item.getQuantity() * item.getPriceAtTime())
+                String.format("₱%.2f", item.getQuantity() * item.getPriceAtTime()),
+                "View Ingredients"  // Button text
             };
             itemsModel.addRow(row);
         }
@@ -175,9 +210,163 @@ public class OrderHistoryPanel extends JPanel {
         buttonPanel.add(closeButton);
         contentPane.add(buttonPanel, BorderLayout.SOUTH);
 
-        dialog.setSize(500, 400);
+        dialog.setSize(600, 400);
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
+    }
+
+    private void showIngredientDetailsDialog(OrderItem item) {
+        Dish dish = controller.getDishById(item.getDishId());
+        if (dish == null) return;
+
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
+            "Dish Ingredients", true);
+        dialog.setLayout(new BorderLayout(10, 10));
+
+        // Create info panel
+        JPanel infoPanel = new JPanel(new GridLayout(3, 1, 5, 5));
+        infoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JLabel nameLabel = new JLabel("Dish: " + dish.getName());
+        nameLabel.setFont(nameLabel.getFont().deriveFont(Font.BOLD));
+        infoPanel.add(nameLabel);
+        
+        JLabel quantityLabel = new JLabel("Quantity Ordered: " + item.getQuantity());
+        infoPanel.add(quantityLabel);
+        
+        JLabel priceLabel = new JLabel(String.format("Price at Time: ₱%.2f", item.getPriceAtTime()));
+        infoPanel.add(priceLabel);
+
+        // Create ingredients table
+        String[] columns = {"Ingredient", "Required Amount", "Total Required"};
+        DefaultTableModel ingredientModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        JTable ingredientTable = new JTable(ingredientModel);
+
+        // Get ingredients for this dish
+        Map<Integer, Double> requiredIngredients = controller.getDishIngredients(dish.getDishId());
+        for (Map.Entry<Integer, Double> entry : requiredIngredients.entrySet()) {
+            Ingredient ingredient = controller.getIngredientById(entry.getKey());
+            if (ingredient != null) {
+                double requiredPerDish = entry.getValue();
+                double totalRequired = requiredPerDish * item.getQuantity();
+                Object[] row = {
+                    ingredient.getName(),
+                    String.format("%.2f %s", requiredPerDish, ingredient.getUnitName()),
+                    String.format("%.2f %s", totalRequired, ingredient.getUnitName())
+                };
+                ingredientModel.addRow(row);
+            }
+        }
+
+        // Add recipe instructions if available
+        if (dish.getRecipeInstructions() != null && !dish.getRecipeInstructions().trim().isEmpty()) {
+            JTextArea recipeArea = new JTextArea(dish.getRecipeInstructions());
+            recipeArea.setEditable(false);
+            recipeArea.setLineWrap(true);
+            recipeArea.setWrapStyleWord(true);
+            recipeArea.setBackground(new Color(250, 250, 250));
+            recipeArea.setBorder(BorderFactory.createTitledBorder("Recipe Instructions"));
+            
+            JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
+            contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            contentPanel.add(infoPanel, BorderLayout.NORTH);
+            contentPanel.add(new JScrollPane(ingredientTable), BorderLayout.CENTER);
+            contentPanel.add(new JScrollPane(recipeArea), BorderLayout.SOUTH);
+            dialog.add(contentPanel, BorderLayout.CENTER);
+        } else {
+            JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
+            contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            contentPanel.add(infoPanel, BorderLayout.NORTH);
+            contentPanel.add(new JScrollPane(ingredientTable), BorderLayout.CENTER);
+            dialog.add(contentPanel, BorderLayout.CENTER);
+        }
+
+        // Add close button
+        JButton closeButton = new JButton("Close");
+        closeButton.addActionListener(e -> dialog.dispose());
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(closeButton);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
+
+        // Show dialog
+        dialog.pack();
+        dialog.setSize(new Dimension(
+            Math.max(dialog.getWidth(), 500),
+            Math.max(dialog.getHeight(), 400)
+        ));
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
+    // Button renderer for the ingredients button column
+    private class ButtonRenderer extends JButton implements TableCellRenderer {
+        public ButtonRenderer(String text) {
+            setText(text);
+            setOpaque(true);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            if (isSelected) {
+                setForeground(table.getSelectionForeground());
+                setBackground(table.getSelectionBackground());
+            } else {
+                setForeground(table.getForeground());
+                setBackground(UIManager.getColor("Button.background"));
+            }
+            return this;
+        }
+    }
+
+    // Button editor for the ingredients button column
+    private class ButtonEditor extends DefaultCellEditor {
+        protected JButton button;
+        private String label;
+        private boolean isPushed;
+
+        public ButtonEditor(JCheckBox checkBox) {
+            super(checkBox);
+            button = new JButton();
+            button.setOpaque(true);
+            button.addActionListener(e -> fireEditingStopped());
+        }
+
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value,
+                boolean isSelected, int row, int column) {
+            if (isSelected) {
+                button.setForeground(table.getSelectionForeground());
+                button.setBackground(table.getSelectionBackground());
+            } else {
+                button.setForeground(table.getForeground());
+                button.setBackground(table.getBackground());
+            }
+            label = (value == null) ? "" : value.toString();
+            button.setText(label);
+            isPushed = true;
+            return button;
+        }
+
+        @Override
+        public Object getCellEditorValue() {
+            if (isPushed) {
+                // Handle button click
+            }
+            isPushed = false;
+            return label;
+        }
+
+        @Override
+        public boolean stopCellEditing() {
+            isPushed = false;
+            return super.stopCellEditing();
+        }
     }
 
     private void showHelpDialog() {

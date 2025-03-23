@@ -8,13 +8,14 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class OrderPanel extends JPanel {
     private final RestaurantController controller;
     private JTable orderItemsTable;
     private DefaultTableModel itemsModel;
     private JComboBox<String> categoryCombo;
-    private JComboBox<Inventory> productCombo;
+    private JComboBox<Dish> productCombo;
     private JSpinner quantitySpinner;
     private JLabel totalLabel;
     private double total = 0.0;
@@ -164,77 +165,181 @@ public class OrderPanel extends JPanel {
     }
 
     private void updateProductCombo() {
-        productCombo.removeAllItems();
         String category = (String) categoryCombo.getSelectedItem();
+        productCombo.removeAllItems();
         if (category != null) {
-            List<Inventory> products = controller.getInventoryItemsByCategory(category);
-            for (Inventory product : products) {
-                if (product.getQuantity() > 0) {
-                    productCombo.addItem(product);
+            List<Dish> dishes = controller.getDishesByCategory(category);
+            for (Dish dish : dishes) {
+                if (dish.isAvailable()) {
+                    productCombo.addItem(dish);
                 }
             }
         }
     }
 
     private void addItemToOrder() {
-        Inventory product = (Inventory) productCombo.getSelectedItem();
-        if (product == null) {
+        Dish selectedDish = (Dish) productCombo.getSelectedItem();
+        if (selectedDish == null) {
             JOptionPane.showMessageDialog(this,
-                "Please select a product to add.",
-                "No Product Selected",
+                "Please select a dish to add to the order.",
+                "No Dish Selected",
                 JOptionPane.WARNING_MESSAGE);
             return;
+        }
+
+        // Show ingredients dialog before adding to order
+        if (!showIngredientDetailsDialog(selectedDish)) {
+            return; // User cancelled or not enough ingredients
         }
 
         int quantity = (int) quantitySpinner.getValue();
-        if (quantity > product.getQuantity()) {
-            JOptionPane.showMessageDialog(this,
-                "Not enough stock available.",
-                "Insufficient Stock",
-                JOptionPane.WARNING_MESSAGE);
-            return;
-        }
 
-        // Check if product already exists in order
+        // Check if the item is already in the order
         for (int i = 0; i < itemsModel.getRowCount(); i++) {
-            if (itemsModel.getValueAt(i, 0).equals(product.getProductName())) {
+            String dishName = (String) itemsModel.getValueAt(i, 0);
+            if (dishName.equals(selectedDish.getName())) {
                 int currentQty = (int) itemsModel.getValueAt(i, 2);
-                if (currentQty + quantity > product.getQuantity()) {
-                    JOptionPane.showMessageDialog(this,
-                        "Not enough stock available.",
-                        "Insufficient Stock",
-                        JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
                 itemsModel.setValueAt(currentQty + quantity, i, 2);
-                double subtotal = (currentQty + quantity) * product.getSellPrice();
-                itemsModel.setValueAt(String.format("₱%.2f", subtotal), i, 4);
+                double subtotal = (currentQty + quantity) * selectedDish.getSellingPrice();
+                itemsModel.setValueAt(String.format("$%.2f", subtotal), i, 4);
+                
+                // Update the OrderItem in our list
+                for (OrderItem item : orderItems) {
+                    if (item.getDishId() == selectedDish.getDishId()) {
+                        item.setQuantity(currentQty + quantity);
+                        break;
+                    }
+                }
+                
                 updateTotal();
                 return;
             }
         }
 
-        // Add new item
-        double subtotal = quantity * product.getSellPrice();
+        // Add new item to the table
+        double subtotal = quantity * selectedDish.getSellingPrice();
         Object[] row = {
-            product.getProductName(),
-            product.getCategoryName(),
+            selectedDish.getName(),
+            selectedDish.getCategoryName(),
             quantity,
-            String.format("₱%.2f", product.getSellPrice()),
-            String.format("₱%.2f", product.getSellPrice() * quantity)
+            String.format("$%.2f", selectedDish.getSellingPrice()),
+            String.format("$%.2f", subtotal)
         };
         itemsModel.addRow(row);
 
         // Add to order items list
-        OrderItem item = new OrderItem(
-            0,  // order_id (will be set when order is created)
-            product.getProductId(),
-            quantity,
-            product.getSellPrice()  // price_at_time
-        );
-        orderItems.add(item);
+        OrderItem newItem = new OrderItem();
+        newItem.setDishId(selectedDish.getDishId());
+        newItem.setDishName(selectedDish.getName());
+        newItem.setQuantity(quantity);
+        newItem.setPriceAtTime(selectedDish.getSellingPrice());
+        orderItems.add(newItem);
 
         updateTotal();
+    }
+
+    private boolean showIngredientDetailsDialog(Dish dish) {
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
+            "Dish Ingredients", true);
+        dialog.setLayout(new BorderLayout(10, 10));
+
+        // Create info panel
+        JPanel infoPanel = new JPanel(new GridLayout(3, 1, 5, 5));
+        infoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JLabel nameLabel = new JLabel("Dish: " + dish.getName());
+        nameLabel.setFont(nameLabel.getFont().deriveFont(Font.BOLD));
+        infoPanel.add(nameLabel);
+        
+        JLabel priceLabel = new JLabel(String.format("Price: $%.2f", dish.getSellingPrice()));
+        infoPanel.add(priceLabel);
+        
+        JLabel categoryLabel = new JLabel("Category: " + dish.getCategoryName());
+        infoPanel.add(categoryLabel);
+
+        // Create ingredients table
+        String[] columns = {"Ingredient", "Required Amount", "Available Stock", "Status"};
+        DefaultTableModel ingredientModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        JTable ingredientTable = new JTable(ingredientModel);
+
+        // Get ingredients for this dish
+        Map<Integer, Double> requiredIngredients = controller.getDishIngredients(dish.getDishId());
+        boolean hasEnoughIngredients = true;
+
+        for (Map.Entry<Integer, Double> entry : requiredIngredients.entrySet()) {
+            Ingredient ingredient = controller.getIngredientById(entry.getKey());
+            if (ingredient != null) {
+                String status = ingredient.getQuantityInStock() >= entry.getValue() ? 
+                    "Available" : "Insufficient Stock";
+                if (status.equals("Insufficient Stock")) {
+                    hasEnoughIngredients = false;
+                }
+                Object[] row = {
+                    ingredient.getName(),
+                    String.format("%.2f %s", entry.getValue(), ingredient.getUnitName()),
+                    String.format("%.2f %s", ingredient.getQuantityInStock(), ingredient.getUnitName()),
+                    status
+                };
+                ingredientModel.addRow(row);
+            }
+        }
+
+        // Add recipe instructions if available
+        if (dish.getRecipeInstructions() != null && !dish.getRecipeInstructions().trim().isEmpty()) {
+            JTextArea recipeArea = new JTextArea(dish.getRecipeInstructions());
+            recipeArea.setEditable(false);
+            recipeArea.setLineWrap(true);
+            recipeArea.setWrapStyleWord(true);
+            recipeArea.setBackground(new Color(250, 250, 250));
+            recipeArea.setBorder(BorderFactory.createTitledBorder("Recipe Instructions"));
+            
+            JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
+            contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            contentPanel.add(infoPanel, BorderLayout.NORTH);
+            contentPanel.add(new JScrollPane(ingredientTable), BorderLayout.CENTER);
+            contentPanel.add(new JScrollPane(recipeArea), BorderLayout.SOUTH);
+            dialog.add(contentPanel, BorderLayout.CENTER);
+        } else {
+            JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
+            contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            contentPanel.add(infoPanel, BorderLayout.NORTH);
+            contentPanel.add(new JScrollPane(ingredientTable), BorderLayout.CENTER);
+            dialog.add(contentPanel, BorderLayout.CENTER);
+        }
+
+        // Add buttons
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton addButton = new JButton(hasEnoughIngredients ? "Add to Order" : "Cannot Add - Insufficient Stock");
+        addButton.setEnabled(hasEnoughIngredients);
+        JButton cancelButton = new JButton("Cancel");
+
+        final boolean[] confirmed = {false};
+        
+        addButton.addActionListener(e -> {
+            confirmed[0] = true;
+            dialog.dispose();
+        });
+        cancelButton.addActionListener(e -> dialog.dispose());
+
+        buttonPanel.add(addButton);
+        buttonPanel.add(cancelButton);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
+
+        // Show dialog
+        dialog.pack();
+        dialog.setSize(new Dimension(
+            Math.max(dialog.getWidth(), 600),
+            Math.max(dialog.getHeight(), 400)
+        ));
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+
+        return confirmed[0];
     }
 
     private void removeSelectedItem() {
@@ -253,7 +358,7 @@ public class OrderPanel extends JPanel {
     }
 
     private void updateTotal() {
-        total = 0.0;
+        double total = 0;
         for (OrderItem item : orderItems) {
             total += item.getQuantity() * item.getPriceAtTime();
         }
@@ -263,161 +368,99 @@ public class OrderPanel extends JPanel {
     private void placeOrder() {
         if (orderItems.isEmpty()) {
             JOptionPane.showMessageDialog(this,
-                "Please add items to the order first.",
+                "Please add items to the order before placing it.",
                 "Empty Order",
                 JOptionPane.WARNING_MESSAGE);
             return;
         }
 
-        // Get customer
-        Customer customer = getCustomer();
-        if (customer == null) return;
-
-        // Get order type
-        String[] types = {"Dine-in", "Takeout", "Delivery"};
-        String type = (String) JOptionPane.showInputDialog(this,
-            "Select order type:",
-            "Order Type",
-            JOptionPane.QUESTION_MESSAGE,
-            null,
-            types,
-            types[0]);
-        if (type == null) return;
-
-        // Get assigned employees
-        List<Integer> employeeIds = getAssignedEmployees();
-        if (employeeIds == null) return;
-
-        // Create order
-        Order order = new Order(
-            0,  // order_id (auto-generated)
-            customer.getCustomerId(),
-            new java.sql.Timestamp(System.currentTimeMillis()),  // order_datetime
-            type.equals("Dine-in") ? "Dine-In" : type,  // match ENUM case exactly
-            "In Progress",  // order_status
-            "Pending",     // payment_status
-            total,         // total_amount
-            null          // payment_method (will be set during payment)
-        );
-
-        // Place order
-        if (controller.createOrder(order, orderItems, employeeIds)) {
-            JOptionPane.showMessageDialog(this,
-                "Order placed successfully!",
-                "Success",
-                JOptionPane.INFORMATION_MESSAGE);
-            clearOrder();
-        } else {
-            JOptionPane.showMessageDialog(this,
-                "Failed to place order. Please try again.",
-                "Error",
-                JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private Customer getCustomer() {
-        // Show dialog to get customer info
-        String[] options = {"Existing Customer", "New Customer"};
-        int choice = JOptionPane.showOptionDialog(this,
-            "Select customer type:",
-            "Customer Selection",
-            JOptionPane.DEFAULT_OPTION,
-            JOptionPane.QUESTION_MESSAGE,
-            null,
-            options,
-            options[0]);
-
-        if (choice == 0) {
-            // Show existing customer selection dialog
-            List<Customer> customers = controller.getAllCustomers();
-            Customer selected = (Customer) JOptionPane.showInputDialog(this,
-                "Select customer:",
-                "Customer Selection",
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                customers.toArray(),
-                null);
-            return selected;
-        } else if (choice == 1) {
-            // Show new customer dialog
-            JTextField firstNameField = new JTextField();
-            JTextField lastNameField = new JTextField();
-            JTextField emailField = new JTextField();
-            JTextField phoneField = new JTextField();
-            JTextField addressField = new JTextField();
-
-            Object[] message = {
-                "First Name:", firstNameField,
-                "Last Name:", lastNameField,
-                "Email:", emailField,
-                "Phone:", phoneField,
-                "Address:", addressField
-            };
-
-            int option = JOptionPane.showConfirmDialog(this,
-                message,
-                "New Customer",
-                JOptionPane.OK_CANCEL_OPTION);
-
-            if (option == JOptionPane.OK_OPTION) {
-                Customer newCustomer = new Customer(
-                    0,
-                    firstNameField.getText(),
-                    lastNameField.getText(),
-                    emailField.getText(),
-                    phoneField.getText(),
-                    addressField.getText()
-                );
-
-                int customerId = controller.addCustomer(newCustomer);
-                if (customerId != -1) {
-                    newCustomer.setCustomerId(customerId);
-                    return newCustomer;
-                } else {
-                    JOptionPane.showMessageDialog(this,
-                        "Failed to create customer.",
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE);
-                }
-            }
-        }
-        return null;
-    }
-
-    private List<Integer> getAssignedEmployees() {
+        // Create customer selection dialog
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Select Customer", true);
+        dialog.setLayout(new BorderLayout());
+        
+        // Create customer selection panel
+        JPanel customerPanel = new JPanel(new BorderLayout());
+        List<Customer> customers = controller.getAllCustomers();
+        JComboBox<Customer> customerCombo = new JComboBox<>(customers.toArray(new Customer[0]));
+        customerPanel.add(new JLabel("Select Customer:"), BorderLayout.WEST);
+        customerPanel.add(customerCombo, BorderLayout.CENTER);
+        
+        // Create employee selection panel
+        JPanel employeePanel = new JPanel(new BorderLayout());
         List<Employee> employees = controller.getAllEmployees();
-        List<Integer> selectedIds = new ArrayList<>();
-
-        // Create checkboxes for each employee
-        List<JCheckBox> checkboxes = new ArrayList<>();
-        for (Employee emp : employees) {
-            JCheckBox cb = new JCheckBox(emp.getFirstName() + " " + emp.getLastName());
-            cb.setActionCommand(String.valueOf(emp.getEmployeeId()));
-            checkboxes.add(cb);
-        }
-
-        // Show dialog with employee checkboxes
-        int result = JOptionPane.showConfirmDialog(this,
-            checkboxes.toArray(),
-            "Select Employees",
-            JOptionPane.OK_CANCEL_OPTION);
-
-        if (result == JOptionPane.OK_OPTION) {
-            for (JCheckBox cb : checkboxes) {
-                if (cb.isSelected()) {
-                    selectedIds.add(Integer.parseInt(cb.getActionCommand()));
-                }
-            }
-            if (selectedIds.isEmpty()) {
-                JOptionPane.showMessageDialog(this,
-                    "Please select at least one employee.",
-                    "No Employees Selected",
+        JComboBox<Employee> employeeCombo = new JComboBox<>(employees.toArray(new Employee[0]));
+        employeePanel.add(new JLabel("Assign Employee:"), BorderLayout.WEST);
+        employeePanel.add(employeeCombo, BorderLayout.CENTER);
+        
+        // Create order type panel
+        JPanel typePanel = new JPanel(new BorderLayout());
+        String[] orderTypes = {"Dine In", "Take Out", "Delivery"};
+        JComboBox<String> typeCombo = new JComboBox<>(orderTypes);
+        typePanel.add(new JLabel("Order Type:"), BorderLayout.WEST);
+        typePanel.add(typeCombo, BorderLayout.CENTER);
+        
+        // Combine panels
+        JPanel selectionPanel = new JPanel(new GridLayout(3, 1, 5, 5));
+        selectionPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        selectionPanel.add(customerPanel);
+        selectionPanel.add(employeePanel);
+        selectionPanel.add(typePanel);
+        
+        // Add buttons
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton confirmButton = new JButton("Place Order");
+        JButton cancelButton = new JButton("Cancel");
+        
+        confirmButton.addActionListener(e -> {
+            Customer selectedCustomer = (Customer) customerCombo.getSelectedItem();
+            Employee selectedEmployee = (Employee) employeeCombo.getSelectedItem();
+            String orderType = (String) typeCombo.getSelectedItem();
+            
+            if (selectedCustomer == null || selectedEmployee == null) {
+                JOptionPane.showMessageDialog(dialog,
+                    "Please select both a customer and an employee.",
+                    "Missing Information",
                     JOptionPane.WARNING_MESSAGE);
-                return null;
+                return;
             }
-            return selectedIds;
-        }
-        return null;
+            
+            // Create the order
+            Order order = new Order();
+            order.setCustomerId(selectedCustomer.getCustomerId());
+            order.setOrderType(orderType);
+            order.setOrderStatus("Pending");
+            order.setPaymentStatus("Pending");
+            
+            // Create list of employee IDs
+            List<Integer> employeeIds = new ArrayList<>();
+            employeeIds.add(selectedEmployee.getEmployeeId());
+            
+            // Try to create the order
+            if (controller.createOrder(order, orderItems, employeeIds)) {
+                JOptionPane.showMessageDialog(this,
+                    "Order placed successfully!",
+                    "Success",
+                    JOptionPane.INFORMATION_MESSAGE);
+                clearOrder();
+                dialog.dispose();
+            } else {
+                JOptionPane.showMessageDialog(this,
+                    "Failed to place order. Please check ingredient availability.",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        
+        cancelButton.addActionListener(e -> dialog.dispose());
+        
+        buttonPanel.add(confirmButton);
+        buttonPanel.add(cancelButton);
+        
+        dialog.add(selectionPanel, BorderLayout.CENTER);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
     }
 
     private JButton createHelpButton(String helpText) {

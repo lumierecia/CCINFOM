@@ -157,19 +157,18 @@ public class PaymentPanel extends JPanel {
         dialog.add(infoPanel, BorderLayout.NORTH);
 
         // Create items table
-        String[] columns = {"Product", "Quantity", "Unit Price", "Subtotal"};
+        String[] columns = {"Dish", "Quantity", "Unit Price", "Subtotal"};
         DefaultTableModel itemsModel = new DefaultTableModel(columns, 0);
         JTable itemsTable = new JTable(itemsModel);
         
         double total = 0;
         for (OrderItem item : order.getItems()) {
-            Inventory product = controller.getInventoryItemById(item.getProductId());
             double subtotal = item.getQuantity() * item.getPriceAtTime();
             Object[] row = {
-                product.getProductName(),
+                item.getDishName(),
                 item.getQuantity(),
-                String.format("$%.2f", item.getPriceAtTime()),
-                String.format("$%.2f", subtotal)
+                String.format("₱%.2f", item.getPriceAtTime()),
+                String.format("₱%.2f", subtotal)
             };
             itemsModel.addRow(row);
             total += subtotal;
@@ -180,7 +179,7 @@ public class PaymentPanel extends JPanel {
 
         // Create total panel
         JPanel totalPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        totalPanel.add(new JLabel("Total: " + String.format("$%.2f", total)));
+        totalPanel.add(new JLabel("Total: " + String.format("₱%.2f", total)));
         dialog.add(totalPanel, BorderLayout.SOUTH);
 
         // Set dialog properties

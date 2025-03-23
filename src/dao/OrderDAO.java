@@ -199,12 +199,12 @@ public class OrderDAO {
         String query = """
             SELECT di.ingredient_id, di.quantity_needed * ? as required_quantity
             FROM DishIngredients di
-            WHERE di.product_id = ?
+            WHERE di.dish_id = ?
         """;
         
         try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, item.getQuantity());
-            pstmt.setInt(2, item.getProductId());
+            pstmt.setInt(2, item.getDishId());
             
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
@@ -248,11 +248,11 @@ public class OrderDAO {
     }
 
     private boolean addOrderItems(Order order) {
-        String query = "INSERT INTO OrderItems (order_id, product_id, quantity, price_at_time) VALUES (?, ?, ?, ?)";
+        String query = "INSERT INTO OrderItems (order_id, dish_id, quantity, price_at_time) VALUES (?, ?, ?, ?)";
         try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             for (OrderItem item : order.getItems()) {
                 pstmt.setInt(1, order.getOrderId());
-                pstmt.setInt(2, item.getProductId());
+                pstmt.setInt(2, item.getDishId());
                 pstmt.setInt(3, item.getQuantity());
                 pstmt.setDouble(4, item.getPriceAtTime());
                 pstmt.addBatch();
@@ -324,14 +324,20 @@ public class OrderDAO {
 
     public List<OrderItem> getOrderItems(int orderId) {
         List<OrderItem> items = new ArrayList<>();
-        String query = "SELECT * FROM OrderItems WHERE order_id = ?";
+        String query = """
+            SELECT oi.*, d.name as dish_name 
+            FROM OrderItems oi 
+            JOIN Dishes d ON oi.dish_id = d.dish_id 
+            WHERE oi.order_id = ?
+        """;
         try (PreparedStatement pstmt = getConnection().prepareStatement(query)) {
             pstmt.setInt(1, orderId);
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     OrderItem item = new OrderItem(
                         rs.getInt("order_id"),
-                        rs.getInt("product_id"),
+                        rs.getInt("dish_id"),
+                        rs.getString("dish_name"),
                         rs.getInt("quantity"),
                         rs.getDouble("price_at_time")
                     );
@@ -340,6 +346,10 @@ public class OrderDAO {
             }
         } catch (SQLException e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Error fetching order items: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
         }
         return items;
     }

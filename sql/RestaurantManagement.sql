@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS `Units` (
 
 CREATE TABLE IF NOT EXISTS `Categories` (
     category_id INT AUTO_INCREMENT PRIMARY KEY,
-    category_name VARCHAR(50) NOT NULL UNIQUE
+    category_name VARCHAR(50) NOT NULL UNIQUE,
+    is_deleted BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS `Roles` (
@@ -115,41 +116,36 @@ CREATE TABLE IF NOT EXISTS `IngredientSuppliers` (
     FOREIGN KEY (supplier_id) REFERENCES Suppliers(supplier_id)
 );
 
-CREATE TABLE IF NOT EXISTS `InventoryItems` (
-    product_id INT AUTO_INCREMENT PRIMARY KEY,
-    product_name VARCHAR(255) NOT NULL UNIQUE KEY,
+CREATE TABLE IF NOT EXISTS `Dishes` (
+    dish_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
     category_id INT NOT NULL,
-    make_price DECIMAL(10, 2) NOT NULL CHECK (make_price > 0),
-    sell_price DECIMAL(10, 2) NOT NULL CHECK (sell_price > 0),
-    quantity INT DEFAULT 0 CHECK (quantity >= 0),
-    last_restock TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    last_restocked_by INT NOT NULL,
+    selling_price DECIMAL(10,2) NOT NULL,
     recipe_instructions TEXT,
-    status ENUM('Available', 'Unavailable') DEFAULT 'Available',
+    is_available BOOLEAN DEFAULT TRUE,
     is_deleted BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (category_id) REFERENCES Categories(category_id),
-    FOREIGN KEY (last_restocked_by) REFERENCES Employees(employee_id)
+    FOREIGN KEY (category_id) REFERENCES Categories(category_id)
 );
 
 CREATE TABLE IF NOT EXISTS `DishIngredients` (
-    product_id INT,
+    dish_id INT,
     ingredient_id INT,
     quantity_needed DECIMAL(10,2) NOT NULL,
     unit_id INT NOT NULL,
-    PRIMARY KEY (product_id, ingredient_id),
-    FOREIGN KEY (product_id) REFERENCES InventoryItems(product_id),
+    PRIMARY KEY (dish_id, ingredient_id),
+    FOREIGN KEY (dish_id) REFERENCES Dishes(dish_id),
     FOREIGN KEY (ingredient_id) REFERENCES Ingredients(ingredient_id),
     FOREIGN KEY (unit_id) REFERENCES Units(unit_id)
 );
 
 CREATE TABLE IF NOT EXISTS `OrderItems` (
     order_id INT NOT NULL,
-    product_id INT NOT NULL,
+    dish_id INT NOT NULL,
     quantity INT NOT NULL CHECK (quantity > 0),
     price_at_time DECIMAL(10,2) NOT NULL,
-    PRIMARY KEY (order_id, product_id),
+    PRIMARY KEY (order_id, dish_id),
     FOREIGN KEY (order_id) REFERENCES Orders(order_id),
-    FOREIGN KEY (product_id) REFERENCES InventoryItems(product_id)
+    FOREIGN KEY (dish_id) REFERENCES Dishes(dish_id)
 );
 
 CREATE TABLE IF NOT EXISTS `AssignedEmployeesToOrders` (
@@ -254,32 +250,32 @@ INSERT INTO IngredientSuppliers (ingredient_id, supplier_id, unit_price, lead_ti
 (9, 1, 87.00, 2, 5.00, TRUE),    -- Onion from Metro
 (10, 1, 92.00, 2, 5.00, TRUE);   -- Tomato from Metro
 
-INSERT INTO InventoryItems (product_name, category_id, make_price, sell_price, quantity, last_restocked_by, recipe_instructions) VALUES 
-('Pork Sinigang', 1, 170.00, 250.00, 50, 1, 'Boil pork with vegetables in tamarind-based soup until tender.'),           -- 1: Main Course
-('Kare-kare', 1, 230.00, 350.00, 50, 2, 'Cook beef until tender. Prepare peanut sauce.'),                               -- 2: Main Course
-('Chicken Adobo', 1, 120.00, 220.00, 50, 3, 'Marinate chicken in soy sauce and vinegar.'),                              -- 3: Main Course
-('Sisig', 1, 160.00, 280.00, 50, 4, 'Grill pork parts, chop finely. Mix with onions.'),                                -- 4: Main Course
-('Burger Steak', 1, 90.00, 190.00, 50, 5, 'Form seasoned ground beef into patties.'),                                   -- 5: Main Course
-('Halo-halo', 2, 40.00, 120.00, 50, 9, 'Layer sweetened ingredients with shaved ice.'),                                 -- 6: Desserts
-('Leche Flan', 2, 50.00, 90.00, 50, 10, 'Caramelize sugar for top. Steam custard mixture.'),                           -- 7: Desserts
-('Mango Shake', 3, 40.00, 85.00, 50, 5, 'Blend fresh ripe mangoes with milk and ice.'),                                -- 8: Beverages
-('Bottomless Iced Tea', 3, 30.00, 60.00, 50, 6, 'Brew tea. Chill and serve with ice.'),                                -- 9: Beverages
-('Steamed Rice', 4, 20.00, 40.00, 50, 9, 'Wash rice thoroughly. Cook in rice cooker.'),                                 -- 10: Sides
-('Mashed Potatoes', 4, 50.00, 70.00, 50, 10, 'Boil potatoes until tender. Mash with butter and milk.');                -- 11: Sides
+INSERT INTO Dishes (name, category_id, selling_price, recipe_instructions) VALUES
+('Pork Sinigang', 1, 250.00, 'Boil pork with vegetables in tamarind-based soup until tender.'),
+('Kare-kare', 1, 350.00, 'Cook beef until tender. Prepare peanut sauce.'),
+('Chicken Adobo', 1, 220.00, 'Marinate chicken in soy sauce and vinegar.'),
+('Sisig', 1, 280.00, 'Grill pork parts, chop finely. Mix with onions.'),
+('Burger Steak', 1, 190.00, 'Form seasoned ground beef into patties.'),
+('Halo-halo', 2, 120.00, 'Layer sweetened ingredients with shaved ice.'),
+('Leche Flan', 2, 90.00, 'Caramelize sugar for top. Steam custard mixture.'),
+('Mango Shake', 3, 85.00, 'Blend fresh ripe mangoes with milk and ice.'),
+('Bottomless Iced Tea', 3, 60.00, 'Brew tea. Chill and serve with ice.'),
+('Steamed Rice', 4, 40.00, 'Wash rice thoroughly. Cook in rice cooker.'),
+('Mashed Potatoes', 4, 70.00, 'Boil potatoes until tender. Mash with butter and milk.');
 
-INSERT INTO DishIngredients (product_id, ingredient_id, quantity_needed, unit_id) VALUES
--- Pork Sinigang (product_id = 1)
+INSERT INTO DishIngredients (dish_id, ingredient_id, quantity_needed, unit_id) VALUES
+-- Pork Sinigang (dish_id = 1)
 (1, 2, 0.3, 1),    -- Pork, 0.3 kg
 (1, 9, 0.1, 1),    -- Onion, 0.1 kg
 (1, 10, 0.2, 1),   -- Tomato, 0.2 kg
 (1, 11, 0.05, 1),  -- Tamarind Base, 0.05 kg
 
--- Kare-kare (product_id = 2)
+-- Kare-kare (dish_id = 2)
 (2, 4, 0.4, 1),     -- Beef, 0.4 kg
 (2, 12, 0.2, 1),    -- Peanut Butter, 0.2 kg
 (2, 5, 0.05, 2),    -- Cooking Oil, 0.05 liters
 
--- Chicken Adobo (product_id = 3)
+-- Chicken Adobo (dish_id = 3)
 (3, 3, 0.3, 1),     -- Chicken, 0.3 kg
 (3, 6, 0.1, 2),     -- Soy Sauce, 0.1 liters
 (3, 7, 0.1, 2),     -- Vinegar, 0.1 liters
@@ -299,7 +295,7 @@ INSERT INTO Orders (customer_id, order_type, order_status, total_amount, payment
 (4, 'Dine-In', 'Served', 650.00, NULL, 'Pending'),          -- 4
 (5, 'Takeout', 'In Progress', 250.00, NULL, 'Pending');      -- 5
 
-INSERT INTO OrderItems (order_id, product_id, quantity, price_at_time) VALUES
+INSERT INTO OrderItems (order_id, dish_id, quantity, price_at_time) VALUES
 (1, 1, 1, 250.00),  -- Pork Sinigang
 (1, 10, 2, 40.00),  -- Steamed Rice x2
 (2, 2, 1, 350.00),  -- Kare-kare

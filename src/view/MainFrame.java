@@ -6,6 +6,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import controller.RestaurantController;
+import view.panels.*;
 
 public class MainFrame extends JFrame {
     private JTabbedPane tabbedPane;
@@ -52,7 +53,7 @@ public class MainFrame extends JFrame {
         tabbedPane.addTab("Transactions", new TransactionsPanel(controller));  // This already contains Orders, Payments, and Shifts
         tabbedPane.addTab("Employees", new EmployeePanel(controller));
         tabbedPane.addTab("Suppliers", new SupplierPanel(controller));
-        tabbedPane.addTab("Menu Items", new RecordsPanel(controller));  // Renamed from "Inventory" to "Menu Items" for clarity
+        tabbedPane.addTab("Dishes", new DishPanel(controller));
         tabbedPane.addTab("Ingredients", new IngredientPanel(controller));  // Added new Ingredients tab
         tabbedPane.addTab("Reports", new ReportsPanel(controller));
     }

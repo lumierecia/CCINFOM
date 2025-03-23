@@ -20,6 +20,7 @@ public class SupplierPanel extends JPanel {
     private JButton deleteButton;
     private JButton viewIngredientsButton;
     private JButton refreshButton;
+    private JButton helpButton;
     private List<Integer> supplierIds = new ArrayList<>();
 
     public SupplierPanel(RestaurantController controller) {
@@ -37,12 +38,14 @@ public class SupplierPanel extends JPanel {
         deleteButton = createStyledButton("Delete Supplier", new Color(220, 53, 69));
         viewIngredientsButton = createStyledButton("View Ingredients", new Color(70, 130, 180));
         refreshButton = createStyledButton("Refresh", new Color(108, 117, 125));
+        helpButton = createStyledButton("Help", new Color(23, 162, 184));
 
         toolBar.add(addButton);
         toolBar.add(editButton);
         toolBar.add(deleteButton);
         toolBar.add(viewIngredientsButton);
         toolBar.add(refreshButton);
+        toolBar.add(helpButton);
 
         // Create table
         String[] columnNames = {"Name", "Contact Person", "Email", "Phone", "Address", "Status"};
@@ -108,6 +111,7 @@ public class SupplierPanel extends JPanel {
             }
         });
         refreshButton.addActionListener(e -> loadSuppliers());
+        helpButton.addActionListener(e -> showHelpDialog());
     }
 
     private void loadSuppliers() {
@@ -297,6 +301,52 @@ public class SupplierPanel extends JPanel {
         dialog.setSize(600, 400);
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
+    }
+
+    private void showHelpDialog() {
+        String helpText = """
+            Supplier Management Help
+            
+            Overview:
+            The supplier management system allows you to manage your restaurant's suppliers and their associated ingredients.
+            
+            Features:
+            1. Add Supplier: Create new supplier entries with contact details
+            2. Edit Supplier: Modify existing supplier information
+            3. Delete Supplier: Remove suppliers no longer in use
+            4. View Ingredients: See all ingredients supplied by a specific supplier
+            5. Refresh: Update the supplier list to show latest changes
+            
+            Tips:
+            • Keep supplier contact information up to date
+            • Regularly review supplier status
+            • Check ingredient associations before deleting suppliers
+            • Use the refresh button after making changes
+            
+            Note: Deleting a supplier will not remove their historical records
+            but will mark them as inactive in the system.
+            """;
+        
+        JDialog helpDialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Supplier Help", true);
+        helpDialog.setLayout(new BorderLayout());
+        
+        JTextArea textArea = new JTextArea(helpText);
+        textArea.setEditable(false);
+        textArea.setMargin(new Insets(10, 10, 10, 10));
+        textArea.setBackground(new Color(250, 250, 250));
+        
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        helpDialog.add(scrollPane, BorderLayout.CENTER);
+        
+        JButton closeButton = new JButton("Close");
+        closeButton.addActionListener(e -> helpDialog.dispose());
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(closeButton);
+        helpDialog.add(buttonPanel, BorderLayout.SOUTH);
+        
+        helpDialog.setSize(500, 400);
+        helpDialog.setLocationRelativeTo(this);
+        helpDialog.setVisible(true);
     }
 
     private JButton createStyledButton(String text, Color backgroundColor) {

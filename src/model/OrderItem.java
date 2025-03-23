@@ -2,30 +2,30 @@ package model;
 
 public class OrderItem {
     private int orderId;
-    private int productId;
-    private String productName;
+    private int dishId;
+    private String dishName;
     private int quantity;
     private double priceAtTime;
 
     // No-args constructor
     public OrderItem() {
         this.orderId = 0;
-        this.productId = 0;
+        this.dishId = 0;
         this.quantity = 0;
         this.priceAtTime = 0.0;
     }
 
-    public OrderItem(int orderId, int productId, String productName, int quantity, double priceAtTime) {
+    public OrderItem(int orderId, int dishId, String dishName, int quantity, double priceAtTime) {
         this.orderId = orderId;
-        this.productId = productId;
-        this.productName = productName;
+        this.dishId = dishId;
+        this.dishName = dishName;
         this.quantity = quantity;
         this.priceAtTime = priceAtTime;
     }
 
-    public OrderItem(int orderId, int productId, int quantity, double priceAtTime) {
+    public OrderItem(int orderId, int dishId, int quantity, double priceAtTime) {
         this.orderId = orderId;
-        this.productId = productId;
+        this.dishId = dishId;
         this.quantity = quantity;
         this.priceAtTime = priceAtTime;
     }
@@ -39,20 +39,20 @@ public class OrderItem {
         this.orderId = orderId;
     }
 
-    public int getProductId() {
-        return productId;
+    public int getDishId() {
+        return dishId;
     }
 
-    public void setProductId(int productId) {
-        this.productId = productId;
+    public void setDishId(int dishId) {
+        this.dishId = dishId;
     }
 
-    public String getProductName() {
-        return productName;
+    public String getDishName() {
+        return dishName;
     }
 
-    public void setProductName(String productName) {
-        this.productName = productName;
+    public void setDishName(String dishName) {
+        this.dishName = dishName;
     }
 
     public int getQuantity() {
