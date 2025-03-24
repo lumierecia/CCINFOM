@@ -94,12 +94,72 @@ public class DishDAO {
     }
 
     public boolean addDish(Dish dish) {
-        String query = """
+        try (Connection conn = getConnection()) {
+            return addDishAndGetId(dish, conn) != -1;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to add dish: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
+    public int addDishAndGetId(Dish dish, Connection conn) throws SQLException {
+        // First check if there's a deleted dish with the same name
+        String checkQuery = "SELECT dish_id FROM Dishes WHERE name = ? AND is_deleted = TRUE";
+        try (PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
+            checkStmt.setString(1, dish.getName());
+            try (ResultSet rs = checkStmt.executeQuery()) {
+                if (rs.next()) {
+                    // Found a deleted dish with the same name, restore it with new values
+                    int existingId = rs.getInt("dish_id");
+                    String updateQuery = """
+                        UPDATE Dishes 
+                        SET category_id = ?, selling_price = ?, recipe_instructions = ?, 
+                            is_available = ?, is_deleted = FALSE 
+                        WHERE dish_id = ?
+                    """;
+                    try (PreparedStatement updateStmt = conn.prepareStatement(updateQuery)) {
+                        updateStmt.setInt(1, getCategoryId(dish.getCategoryName()));
+                        updateStmt.setDouble(2, dish.getSellingPrice());
+                        updateStmt.setString(3, dish.getRecipeInstructions());
+                        updateStmt.setBoolean(4, dish.isAvailable());
+                        updateStmt.setInt(5, existingId);
+                        
+                        if (updateStmt.executeUpdate() > 0) {
+                            // Also delete any existing ingredient requirements
+                            String deleteIngredientsQuery = "DELETE FROM DishIngredients WHERE dish_id = ?";
+                            try (PreparedStatement deleteStmt = conn.prepareStatement(deleteIngredientsQuery)) {
+                                deleteStmt.setInt(1, existingId);
+                                deleteStmt.executeUpdate();
+                            }
+                            return existingId;
+                        }
+                    }
+                }
+            }
+        }
+
+        // If no deleted dish found with the same name, check if an active dish exists
+        String activeCheckQuery = "SELECT dish_id FROM Dishes WHERE name = ? AND is_deleted = FALSE";
+        try (PreparedStatement activeCheckStmt = conn.prepareStatement(activeCheckQuery)) {
+            activeCheckStmt.setString(1, dish.getName());
+            try (ResultSet rs = activeCheckStmt.executeQuery()) {
+                if (rs.next()) {
+                    throw new SQLException("A dish with this name already exists");
+                }
+            }
+        }
+
+        // If no existing dish found, create a new one
+        String insertQuery = """
             INSERT INTO Dishes (name, category_id, selling_price, recipe_instructions, is_available) 
             VALUES (?, ?, ?, ?, ?)
         """;
         
-        try (PreparedStatement stmt = getConnection().prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement stmt = conn.prepareStatement(insertQuery, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, dish.getName());
             stmt.setInt(2, getCategoryId(dish.getCategoryName()));
             stmt.setDouble(3, dish.getSellingPrice());
@@ -110,19 +170,14 @@ public class DishDAO {
             if (affectedRows > 0) {
                 try (ResultSet rs = stmt.getGeneratedKeys()) {
                     if (rs.next()) {
-                        dish.setDishId(rs.getInt(1));
-                        return true;
+                        int dishId = rs.getInt(1);
+                        dish.setDishId(dishId);
+                        return dishId;
                     }
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Failed to add dish: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
         }
-        return false;
+        return -1;
     }
 
     public boolean updateDish(Dish dish) {
