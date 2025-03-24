@@ -578,15 +578,15 @@ public class RestaurantController {
         String query = """
             SELECT
                 DATE(o.order_datetime) AS sales_date,
-                SUM(oi.quantity * i.sell_price) AS total_sales,
-                AVG(oi.quantity * i.sell_price) AS average_sales,
-                i.product_name AS top_product,
+                SUM(oi.quantity * oi.price_at_time) AS total_sales,
+                AVG(oi.quantity * oi.price_at_time) AS average_sales,
+                d.name AS top_product,
                 SUM(oi.quantity) AS product_sold
             FROM Orders o
             JOIN OrderItems oi ON o.order_id = oi.order_id
-            JOIN InventoryItems i ON oi.product_id = i.product_id
-            WHERE DATE(o.order_datetime) LIKE ?
-            GROUP BY sales_date, i.product_name
+            JOIN Dishes d ON oi.dish_id = d.dish_id
+            WHERE DATE(o.order_datetime) LIKE ? AND d.is_deleted = FALSE
+            GROUP BY sales_date, d.name
             ORDER BY sales_date, product_sold DESC
         """;
 
@@ -617,14 +617,14 @@ public class RestaurantController {
         String query = """
             SELECT
                 COUNT(DISTINCT o.order_id) AS total_orders,
-                SUM(oi.quantity * i.sell_price) AS total_amount_spent,
-                i.product_name AS most_bought_product,
+                SUM(oi.quantity * oi.price_at_time) AS total_amount_spent,
+                d.name AS most_bought_product,
                 SUM(oi.quantity) AS most_bought_quantity
             FROM Orders o
             JOIN OrderItems oi ON o.order_id = oi.order_id
-            JOIN InventoryItems i ON oi.product_id = i.product_id
-            WHERE DATE(o.order_datetime) LIKE ?
-            GROUP BY i.product_name
+            JOIN Dishes d ON oi.dish_id = d.dish_id
+            WHERE DATE(o.order_datetime) LIKE ? AND d.is_deleted = FALSE
+            GROUP BY d.name
             ORDER BY most_bought_quantity DESC
             LIMIT 1
         """;
@@ -702,14 +702,14 @@ public class RestaurantController {
                 o.order_datetime,
                 COUNT(*) AS total_orders_with_item,
                 SUM(oi.quantity) AS total_amount_ordered,
-                SUM(oi.quantity) * i.sell_price AS total_revenue,
-                SUM(oi.quantity) * i.make_price AS total_cost,
-                (SUM(oi.quantity) * i.sell_price) - (SUM(oi.quantity) * i.make_price) AS total_profit
-            FROM InventoryItems i
-            JOIN OrderItems oi ON i.product_id = oi.product_id
+                SUM(oi.quantity * oi.price_at_time) AS total_revenue,
+                SUM(oi.quantity * d.selling_price) AS total_cost,
+                SUM(oi.quantity * (oi.price_at_time - d.selling_price)) AS total_profit
+            FROM Dishes d
+            JOIN OrderItems oi ON d.dish_id = oi.dish_id
             JOIN Orders o ON o.order_id = oi.order_id
-            WHERE DATE(o.order_datetime) LIKE ?
-            GROUP BY i.product_id, o.order_id, o.order_datetime
+            WHERE DATE(o.order_datetime) LIKE ? AND d.is_deleted = FALSE
+            GROUP BY d.dish_id, o.order_id, o.order_datetime
             ORDER BY total_profit DESC
         """;
 
