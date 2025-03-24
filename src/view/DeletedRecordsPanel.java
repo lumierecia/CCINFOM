@@ -165,7 +165,7 @@ public class DeletedRecordsPanel extends JPanel {
         JPanel panel = new JPanel(new BorderLayout());
         
         // Create table
-        String[] columns = {"ID", "Name", "Category", "Make Price", "Sell Price", "Quantity"};
+        String[] columns = {"ID", "Name", "Category", "Status", "Last Updated"};
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -178,13 +178,14 @@ public class DeletedRecordsPanel extends JPanel {
         JScrollPane scrollPane = new JScrollPane(deletedInventoryTable);
         panel.add(scrollPane, BorderLayout.CENTER);
         
-        // Add restore button
-        JButton restoreButton = new JButton("Restore Selected");
-        restoreButton.addActionListener(e -> restoreSelectedInventoryItem());
+        // Add info label since soft deletion is not supported for inventory
+        JLabel infoLabel = new JLabel("Note: Inventory items use direct deletion for better data consistency.");
+        infoLabel.setForeground(Color.GRAY);
+        infoLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.add(restoreButton);
-        panel.add(buttonPanel, BorderLayout.SOUTH);
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(infoLabel, BorderLayout.CENTER);
+        panel.add(bottomPanel, BorderLayout.SOUTH);
         
         tabbedPane.addTab("Inventory", panel);
     }
@@ -233,16 +234,9 @@ public class DeletedRecordsPanel extends JPanel {
         }
     }
 
-    private void restoreSelectedInventoryItem() {
-        int selectedRow = deletedInventoryTable.getSelectedRow();
-        if (selectedRow >= 0) {
-            int productId = (int) deletedInventoryTable.getValueAt(selectedRow, 0);
-            if (controller.restoreInventoryItem(productId)) {
-                refreshInventoryTable();
-                JOptionPane.showMessageDialog(this, "Inventory item restored successfully!");
-            }
-        }
-    }
+    /*private void restoreSelectedInventoryItem() {
+        // Not implemented since inventory items use direct deletion
+    }*/
 
     public void refreshAllTables() {
         refreshCustomersTable();
@@ -321,10 +315,9 @@ public class DeletedRecordsPanel extends JPanel {
                 item.getProductId(),
                 item.getProductName(),
                 item.getCategoryName(),
-                item.getMakePrice(),
-                item.getSellPrice(),
-                item.getQuantity()
+                item.getStatus(),
+                item.getLastUpdated()
             });
         }
     }
-} 
+}

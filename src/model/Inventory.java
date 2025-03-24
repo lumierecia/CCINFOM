@@ -11,6 +11,7 @@ public class Inventory {
     private String status;
     private String recipeInstructions;
     private int lastRestockedBy;
+    private String lastUpdated;
 
     public Inventory() {
     }
@@ -117,6 +118,14 @@ public class Inventory {
 
     public void setLastRestockedBy(int lastRestockedBy) {
         this.lastRestockedBy = lastRestockedBy;
+    }
+
+    public String getLastUpdated() {
+        return lastUpdated;
+    }
+
+    public void setLastUpdated(String lastUpdated) {
+        this.lastUpdated = lastUpdated;
     }
 
     @Override
