@@ -9,6 +9,7 @@ import java.util.List;
 import javax.swing.JOptionPane;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Collections;
 
 public class DishDAO {
     private Connection getConnection() throws SQLException {
@@ -16,31 +17,65 @@ public class DishDAO {
     }
 
     public int createDish(Dish dish) throws SQLException {
-        try (Connection conn = getConnection();
-             PreparedStatement stmt = conn.prepareStatement("""
-                INSERT INTO Dishes (
-                    name, category_id, selling_price, recipe_instructions, is_available
-                ) VALUES (?, ?, ?, ?, ?)
-                """, Statement.RETURN_GENERATED_KEYS)) {
-            stmt.setString(1, dish.getName());
-            stmt.setInt(2, dish.getCategoryId());
-            stmt.setDouble(3, dish.getSellingPrice());
-            stmt.setString(4, dish.getRecipeInstructions());
-            stmt.setBoolean(5, dish.isAvailable());
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // Create the dish first
+                try (PreparedStatement stmt = conn.prepareStatement("""
+                    INSERT INTO Dishes (
+                        name, category_id, selling_price, recipe_instructions, is_available
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """, Statement.RETURN_GENERATED_KEYS)) {
+                    stmt.setString(1, dish.getName());
+                    stmt.setInt(2, dish.getCategoryId());
+                    stmt.setDouble(3, dish.getSellingPrice());
+                    stmt.setString(4, dish.getRecipeInstructions());
+                    stmt.setBoolean(5, dish.isAvailable());
 
-            int affectedRows = stmt.executeUpdate();
-            if (affectedRows > 0) {
-                try (ResultSet rs = stmt.getGeneratedKeys()) {
-                    if (rs.next()) {
-                        int dishId = rs.getInt(1);
-                        if (!dish.getIngredients().isEmpty()) {
-                            addDishIngredients(dishId, dish.getIngredients());
+                    int affectedRows = stmt.executeUpdate();
+                    if (affectedRows == 0) {
+                        conn.rollback();
+                        return -1;
+                    }
+
+                    try (ResultSet rs = stmt.getGeneratedKeys()) {
+                        if (rs.next()) {
+                            int dishId = rs.getInt(1);
+
+                            // Add ingredients if any
+                            if (!dish.getIngredients().isEmpty()) {
+                                String ingredientQuery = """
+                                    INSERT INTO DishIngredients (
+                                        dish_id, ingredient_id, quantity_needed, unit_id
+                                    ) VALUES (?, ?, ?, ?)
+                                    """;
+                                try (PreparedStatement ingredientStmt = conn.prepareStatement(ingredientQuery)) {
+                                    for (DishIngredient ingredient : dish.getIngredients()) {
+                                        ingredientStmt.setInt(1, dishId);
+                                        ingredientStmt.setInt(2, ingredient.getIngredientId());
+                                        ingredientStmt.setDouble(3, ingredient.getQuantityNeeded());
+                                        ingredientStmt.setInt(4, ingredient.getUnitId());
+                                        ingredientStmt.addBatch();
+                                    }
+                                    int[] results = ingredientStmt.executeBatch();
+                                    if (results.length != dish.getIngredients().size()) {
+                                        conn.rollback();
+                                        return -1;
+                                    }
+                                }
+                            }
+
+                            conn.commit();
+                            return dishId;
                         }
-                        return dishId;
                     }
                 }
+                conn.rollback();
+                return -1;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
             }
-            return -1;
         }
     }
 
@@ -70,21 +105,49 @@ public class DishDAO {
             WHERE d.dish_id = ? AND d.is_deleted = FALSE
         """;
 
-        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
-            stmt.setInt(1, dishId);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    Dish dish = new Dish(
+        try (Connection conn = getConnection()) {
+            try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                stmt.setInt(1, dishId);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        Dish dish = new Dish(
                             rs.getInt("dish_id"),
                             rs.getString("name"),
                             rs.getInt("category_id"),
                             rs.getDouble("selling_price"),
                             rs.getString("recipe_instructions"),
                             rs.getBoolean("is_available")
-                    );
-                    dish.setCategoryName(rs.getString("category_name"));
-                    dish.setIngredients(getDishIngredients(dishId));
-                    return dish;
+                        );
+                        dish.setCategoryName(rs.getString("category_name"));
+
+                        // Get ingredients using the same connection
+                        String ingredientQuery = """
+                            SELECT di.*, i.name as ingredient_name, u.unit_name
+                            FROM DishIngredients di
+                            JOIN Ingredients i ON di.ingredient_id = i.ingredient_id
+                            JOIN Units u ON di.unit_id = u.unit_id
+                            WHERE di.dish_id = ?
+                        """;
+                        List<DishIngredient> ingredients = new ArrayList<>();
+                        try (PreparedStatement ingredientStmt = conn.prepareStatement(ingredientQuery)) {
+                            ingredientStmt.setInt(1, dishId);
+                            try (ResultSet ingredientRs = ingredientStmt.executeQuery()) {
+                                while (ingredientRs.next()) {
+                                    DishIngredient ingredient = new DishIngredient(
+                                        ingredientRs.getInt("dish_id"),
+                                        ingredientRs.getInt("ingredient_id"),
+                                        ingredientRs.getDouble("quantity_needed"),
+                                        ingredientRs.getInt("unit_id")
+                                    );
+                                    ingredient.setIngredientName(ingredientRs.getString("ingredient_name"));
+                                    ingredient.setUnitName(ingredientRs.getString("unit_name"));
+                                    ingredients.add(ingredient);
+                                }
+                            }
+                        }
+                        dish.setIngredients(ingredients);
+                        return dish;
+                    }
                 }
             }
         }
@@ -93,18 +156,19 @@ public class DishDAO {
 
     public List<Dish> getAllDishes() throws SQLException {
         List<Dish> dishes = new ArrayList<>();
-        try (Connection conn = getConnection()) {
-            // First get all dishes
-            String query = """
-                SELECT d.*, c.category_name
-                FROM Dishes d
-                JOIN Categories c ON d.category_id = c.category_id
-                WHERE d.is_deleted = FALSE
-                ORDER BY d.name
-            """;
+        String query = """
+            SELECT d.*, c.category_name
+            FROM Dishes d
+            JOIN Categories c ON d.category_id = c.category_id
+            WHERE d.is_deleted = FALSE
+            ORDER BY d.name
+        """;
 
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery(query)) {
+        try (Connection conn = getConnection()) {
+            // First, get all dishes
+            List<Integer> dishIds = new ArrayList<>();
+            try (PreparedStatement stmt = conn.prepareStatement(query);
+                 ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     Dish dish = new Dish(
                         rs.getInt("dish_id"),
@@ -115,34 +179,47 @@ public class DishDAO {
                         rs.getBoolean("is_available")
                     );
                     dish.setCategoryName(rs.getString("category_name"));
-                    
-                    // Get ingredients using the same connection
-                    String ingredientQuery = """
-                        SELECT di.*, i.name as ingredient_name, u.unit_name
-                        FROM DishIngredients di
-                        JOIN Ingredients i ON di.ingredient_id = i.ingredient_id
-                        JOIN Units u ON di.unit_id = u.unit_id
-                        WHERE di.dish_id = ?
-                    """;
-                    try (PreparedStatement ingredientStmt = conn.prepareStatement(ingredientQuery)) {
-                        ingredientStmt.setInt(1, dish.getDishId());
-                        try (ResultSet ingredientRs = ingredientStmt.executeQuery()) {
-                            List<DishIngredient> ingredients = new ArrayList<>();
-                            while (ingredientRs.next()) {
-                                DishIngredient ingredient = new DishIngredient(
-                                    ingredientRs.getInt("dish_id"),
-                                    ingredientRs.getInt("ingredient_id"),
-                                    ingredientRs.getDouble("quantity_needed"),
-                                    ingredientRs.getInt("unit_id")
-                                );
-                                ingredient.setIngredientName(ingredientRs.getString("ingredient_name"));
-                                ingredient.setUnitName(ingredientRs.getString("unit_name"));
-                                ingredients.add(ingredient);
-                            }
-                            dish.setIngredients(ingredients);
+                    dishes.add(dish);
+                    dishIds.add(dish.getDishId());
+                }
+            }
+
+            // Then, get ingredients for all dishes in a single query
+            if (!dishIds.isEmpty()) {
+                String ingredientQuery = """
+                    SELECT di.*, i.name as ingredient_name, u.unit_name, di.dish_id
+                    FROM DishIngredients di
+                    JOIN Ingredients i ON di.ingredient_id = i.ingredient_id
+                    JOIN Units u ON di.unit_id = u.unit_id
+                    WHERE di.dish_id IN (
+                """;
+                ingredientQuery += String.join(",", Collections.nCopies(dishIds.size(), "?")) + ")";
+
+                Map<Integer, List<DishIngredient>> ingredientMap = new HashMap<>();
+                try (PreparedStatement stmt = conn.prepareStatement(ingredientQuery)) {
+                    for (int i = 0; i < dishIds.size(); i++) {
+                        stmt.setInt(i + 1, dishIds.get(i));
+                    }
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) {
+                            DishIngredient ingredient = new DishIngredient(
+                                rs.getInt("dish_id"),
+                                rs.getInt("ingredient_id"),
+                                rs.getDouble("quantity_needed"),
+                                rs.getInt("unit_id")
+                            );
+                            ingredient.setIngredientName(rs.getString("ingredient_name"));
+                            ingredient.setUnitName(rs.getString("unit_name"));
+                            
+                            ingredientMap.computeIfAbsent(rs.getInt("dish_id"), k -> new ArrayList<>())
+                                       .add(ingredient);
                         }
                     }
-                    dishes.add(dish);
+                }
+
+                // Assign ingredients to dishes
+                for (Dish dish : dishes) {
+                    dish.setIngredients(ingredientMap.getOrDefault(dish.getDishId(), new ArrayList<>()));
                 }
             }
         }
@@ -151,15 +228,17 @@ public class DishDAO {
 
     public List<Dish> getDishesByCategory(String category) throws SQLException {
         List<Dish> dishes = new ArrayList<>();
-        try (Connection conn = getConnection()) {
-            String query = """
-                SELECT d.*, c.category_name
-                FROM Dishes d
-                JOIN Categories c ON d.category_id = c.category_id
-                WHERE c.category_name = ? AND d.is_deleted = FALSE
-                ORDER BY d.name
-            """;
+        String query = """
+            SELECT d.*, c.category_name
+            FROM Dishes d
+            JOIN Categories c ON d.category_id = c.category_id
+            WHERE c.category_name = ? AND d.is_deleted = FALSE
+            ORDER BY d.name
+        """;
 
+        try (Connection conn = getConnection()) {
+            // First, get all dishes in the category
+            List<Integer> dishIds = new ArrayList<>();
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
                 stmt.setString(1, category);
                 try (ResultSet rs = stmt.executeQuery()) {
@@ -173,35 +252,48 @@ public class DishDAO {
                             rs.getBoolean("is_available")
                         );
                         dish.setCategoryName(rs.getString("category_name"));
-                        
-                        // Get ingredients using the same connection
-                        String ingredientQuery = """
-                            SELECT di.*, i.name as ingredient_name, u.unit_name
-                            FROM DishIngredients di
-                            JOIN Ingredients i ON di.ingredient_id = i.ingredient_id
-                            JOIN Units u ON di.unit_id = u.unit_id
-                            WHERE di.dish_id = ?
-                        """;
-                        try (PreparedStatement ingredientStmt = conn.prepareStatement(ingredientQuery)) {
-                            ingredientStmt.setInt(1, dish.getDishId());
-                            try (ResultSet ingredientRs = ingredientStmt.executeQuery()) {
-                                List<DishIngredient> ingredients = new ArrayList<>();
-                                while (ingredientRs.next()) {
-                                    DishIngredient ingredient = new DishIngredient(
-                                        ingredientRs.getInt("dish_id"),
-                                        ingredientRs.getInt("ingredient_id"),
-                                        ingredientRs.getDouble("quantity_needed"),
-                                        ingredientRs.getInt("unit_id")
-                                    );
-                                    ingredient.setIngredientName(ingredientRs.getString("ingredient_name"));
-                                    ingredient.setUnitName(ingredientRs.getString("unit_name"));
-                                    ingredients.add(ingredient);
-                                }
-                                dish.setIngredients(ingredients);
-                            }
-                        }
                         dishes.add(dish);
+                        dishIds.add(dish.getDishId());
                     }
+                }
+            }
+
+            // Then, get ingredients for all dishes in a single query
+            if (!dishIds.isEmpty()) {
+                String ingredientQuery = """
+                    SELECT di.*, i.name as ingredient_name, u.unit_name, di.dish_id
+                    FROM DishIngredients di
+                    JOIN Ingredients i ON di.ingredient_id = i.ingredient_id
+                    JOIN Units u ON di.unit_id = u.unit_id
+                    WHERE di.dish_id IN (
+                """;
+                ingredientQuery += String.join(",", Collections.nCopies(dishIds.size(), "?")) + ")";
+
+                Map<Integer, List<DishIngredient>> ingredientMap = new HashMap<>();
+                try (PreparedStatement stmt = conn.prepareStatement(ingredientQuery)) {
+                    for (int i = 0; i < dishIds.size(); i++) {
+                        stmt.setInt(i + 1, dishIds.get(i));
+                    }
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) {
+                            DishIngredient ingredient = new DishIngredient(
+                                rs.getInt("dish_id"),
+                                rs.getInt("ingredient_id"),
+                                rs.getDouble("quantity_needed"),
+                                rs.getInt("unit_id")
+                            );
+                            ingredient.setIngredientName(rs.getString("ingredient_name"));
+                            ingredient.setUnitName(rs.getString("unit_name"));
+                            
+                            ingredientMap.computeIfAbsent(rs.getInt("dish_id"), k -> new ArrayList<>())
+                                       .add(ingredient);
+                        }
+                    }
+                }
+
+                // Assign ingredients to dishes
+                for (Dish dish : dishes) {
+                    dish.setIngredients(ingredientMap.getOrDefault(dish.getDishId(), new ArrayList<>()));
                 }
             }
         }
@@ -209,54 +301,86 @@ public class DishDAO {
     }
 
     public boolean updateDish(Dish dish) throws SQLException {
-        String query = """
-            UPDATE Dishes 
-            SET name = ?, category_id = ?, selling_price = ?, 
-                recipe_instructions = ?, is_available = ?
-            WHERE dish_id = ? AND is_deleted = FALSE
-        """;
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                String query = """
+                    UPDATE Dishes 
+                    SET name = ?, category_id = ?, selling_price = ?, 
+                        recipe_instructions = ?, is_available = ?
+                    WHERE dish_id = ? AND is_deleted = FALSE
+                """;
 
-        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
-            stmt.setString(1, dish.getName());
-            stmt.setInt(2, dish.getCategoryId());
-            stmt.setDouble(3, dish.getSellingPrice());
-            stmt.setString(4, dish.getRecipeInstructions());
-            stmt.setBoolean(5, dish.isAvailable());
-            stmt.setInt(6, dish.getDishId());
+                try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                    stmt.setString(1, dish.getName());
+                    stmt.setInt(2, dish.getCategoryId());
+                    stmt.setDouble(3, dish.getSellingPrice());
+                    stmt.setString(4, dish.getRecipeInstructions());
+                    stmt.setBoolean(5, dish.isAvailable());
+                    stmt.setInt(6, dish.getDishId());
 
-            boolean success = stmt.executeUpdate() > 0;
-            if (success && !dish.getIngredients().isEmpty()) {
-                // Delete existing ingredients
-                String deleteQuery = "DELETE FROM DishIngredients WHERE dish_id = ?";
-                try (PreparedStatement deleteStmt = getConnection().prepareStatement(deleteQuery)) {
-                    deleteStmt.setInt(1, dish.getDishId());
-                    deleteStmt.executeUpdate();
+                    boolean success = stmt.executeUpdate() > 0;
+                    if (success && !dish.getIngredients().isEmpty()) {
+                        // Delete existing ingredients
+                        String deleteQuery = "DELETE FROM DishIngredients WHERE dish_id = ?";
+                        try (PreparedStatement deleteStmt = conn.prepareStatement(deleteQuery)) {
+                            deleteStmt.setInt(1, dish.getDishId());
+                            deleteStmt.executeUpdate();
+                        }
+
+                        // Add new ingredients
+                        String insertQuery = """
+                            INSERT INTO DishIngredients (
+                                dish_id, ingredient_id, quantity_needed, unit_id
+                            ) VALUES (?, ?, ?, ?)
+                        """;
+                        try (PreparedStatement insertStmt = conn.prepareStatement(insertQuery)) {
+                            for (DishIngredient ingredient : dish.getIngredients()) {
+                                insertStmt.setInt(1, dish.getDishId());
+                                insertStmt.setInt(2, ingredient.getIngredientId());
+                                insertStmt.setDouble(3, ingredient.getQuantityNeeded());
+                                insertStmt.setInt(4, ingredient.getUnitId());
+                                insertStmt.addBatch();
+                            }
+                            int[] results = insertStmt.executeBatch();
+                            success = results.length == dish.getIngredients().size();
+                        }
+                    }
+
+                    if (success) {
+                        conn.commit();
+                        return true;
+                    } else {
+                        conn.rollback();
+                        return false;
+                    }
                 }
-                // Add new ingredients
-                addDishIngredients(dish.getDishId(), dish.getIngredients());
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
             }
-            return success;
         }
     }
 
-    public List<DishIngredient> getDishIngredients(int dishId) throws SQLException {
+    private List<DishIngredient> getDishIngredients(Connection conn, int dishId) throws SQLException {
         List<DishIngredient> ingredients = new ArrayList<>();
-        try (Connection conn = getConnection();
-             PreparedStatement stmt = conn.prepareStatement("""
-                SELECT di.*, i.name as ingredient_name, u.unit_name
-                FROM DishIngredients di
-                JOIN Ingredients i ON di.ingredient_id = i.ingredient_id
-                JOIN Units u ON di.unit_id = u.unit_id
-                WHERE di.dish_id = ?
-                """)) {
+        String query = """
+            SELECT di.*, i.name as ingredient_name, u.unit_name
+            FROM DishIngredients di
+            JOIN Ingredients i ON di.ingredient_id = i.ingredient_id
+            JOIN Units u ON di.unit_id = u.unit_id
+            WHERE di.dish_id = ?
+        """;
+        
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setInt(1, dishId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     DishIngredient ingredient = new DishIngredient(
-                            rs.getInt("dish_id"),
-                            rs.getInt("ingredient_id"),
-                            rs.getDouble("quantity_needed"),
-                            rs.getInt("unit_id")
+                        rs.getInt("dish_id"),
+                        rs.getInt("ingredient_id"),
+                        rs.getDouble("quantity_needed"),
+                        rs.getInt("unit_id")
                     );
                     ingredient.setIngredientName(rs.getString("ingredient_name"));
                     ingredient.setUnitName(rs.getString("unit_name"));
@@ -265,6 +389,12 @@ public class DishDAO {
             }
         }
         return ingredients;
+    }
+
+    public List<DishIngredient> getDishIngredients(int dishId) throws SQLException {
+        try (Connection conn = getConnection()) {
+            return getDishIngredients(conn, dishId);
+        }
     }
 
     public boolean createDish(String name, int categoryId, double sellingPrice, String recipeInstructions) throws SQLException {
@@ -307,18 +437,71 @@ public class DishDAO {
 
     public List<Dish> getAvailableDishes() throws SQLException {
         List<Dish> dishes = new ArrayList<>();
-        String query = "SELECT * FROM Dishes WHERE is_available = TRUE AND is_deleted = FALSE ORDER BY name";
-        try (Statement stmt = getConnection().createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
-            while (rs.next()) {
-                dishes.add(new Dish(
+        String query = """
+            SELECT d.*, c.category_name
+            FROM Dishes d
+            JOIN Categories c ON d.category_id = c.category_id
+            WHERE d.is_available = TRUE AND d.is_deleted = FALSE
+            ORDER BY d.name
+        """;
+
+        try (Connection conn = getConnection()) {
+            // First, get all available dishes
+            List<Integer> dishIds = new ArrayList<>();
+            try (PreparedStatement stmt = conn.prepareStatement(query);
+                 ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Dish dish = new Dish(
                         rs.getInt("dish_id"),
                         rs.getString("name"),
                         rs.getInt("category_id"),
                         rs.getDouble("selling_price"),
                         rs.getString("recipe_instructions"),
                         rs.getBoolean("is_available")
-                ));
+                    );
+                    dish.setCategoryName(rs.getString("category_name"));
+                    dishes.add(dish);
+                    dishIds.add(dish.getDishId());
+                }
+            }
+
+            // Then, get ingredients for all dishes in a single query
+            if (!dishIds.isEmpty()) {
+                String ingredientQuery = """
+                    SELECT di.*, i.name as ingredient_name, u.unit_name, di.dish_id
+                    FROM DishIngredients di
+                    JOIN Ingredients i ON di.ingredient_id = i.ingredient_id
+                    JOIN Units u ON di.unit_id = u.unit_id
+                    WHERE di.dish_id IN (
+                """;
+                ingredientQuery += String.join(",", Collections.nCopies(dishIds.size(), "?")) + ")";
+
+                Map<Integer, List<DishIngredient>> ingredientMap = new HashMap<>();
+                try (PreparedStatement stmt = conn.prepareStatement(ingredientQuery)) {
+                    for (int i = 0; i < dishIds.size(); i++) {
+                        stmt.setInt(i + 1, dishIds.get(i));
+                    }
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) {
+                            DishIngredient ingredient = new DishIngredient(
+                                rs.getInt("dish_id"),
+                                rs.getInt("ingredient_id"),
+                                rs.getDouble("quantity_needed"),
+                                rs.getInt("unit_id")
+                            );
+                            ingredient.setIngredientName(rs.getString("ingredient_name"));
+                            ingredient.setUnitName(rs.getString("unit_name"));
+                            
+                            ingredientMap.computeIfAbsent(rs.getInt("dish_id"), k -> new ArrayList<>())
+                                       .add(ingredient);
+                        }
+                    }
+                }
+
+                // Assign ingredients to dishes
+                for (Dish dish : dishes) {
+                    dish.setIngredients(ingredientMap.getOrDefault(dish.getDishId(), new ArrayList<>()));
+                }
             }
         }
         return dishes;
