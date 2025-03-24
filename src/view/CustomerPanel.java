@@ -28,7 +28,16 @@ public class CustomerPanel extends JPanel {
         this.controller = controller;
         setLayout(new BorderLayout());
         initComponents();
-        loadCustomers();
+        try {
+            loadCustomers();
+        } catch (SQLException e) {
+            SwingUtilities.invokeLater(() -> {
+                JOptionPane.showMessageDialog(this,
+                    "Error loading customers: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+            });
+        }
     }
 
     private void initComponents() {
@@ -73,10 +82,17 @@ public class CustomerPanel extends JPanel {
         editButton.addActionListener(e -> {
             int selectedRow = customerTable.getSelectedRow();
             if (selectedRow != -1) {
-                int customerId = customerIds.get(selectedRow);
-                Customer customer = controller.getCustomerById(customerId);
-                if (customer != null) {
-                    showCustomerDialog(customer);
+                try {
+                    int customerId = customerIds.get(selectedRow);
+                    Customer customer = controller.getCustomerById(customerId);
+                    if (customer != null) {
+                        showCustomerDialog(customer);
+                    }
+                } catch (SQLException ex) {
+                    JOptionPane.showMessageDialog(this,
+                        "Error loading customer details: " + ex.getMessage(),
+                        "Database Error",
+                        JOptionPane.ERROR_MESSAGE);
                 }
             } else {
                 JOptionPane.showMessageDialog(this,
@@ -94,13 +110,20 @@ public class CustomerPanel extends JPanel {
                         "Confirm Delete",
                         JOptionPane.YES_NO_OPTION);
                 if (confirm == JOptionPane.YES_OPTION) {
-                    if (controller.deleteCustomer(customerId)) {
-                        loadCustomers();
-                    } else {
+                    try {
+                        if (controller.deleteCustomer(customerId)) {
+                            loadCustomers();
+                        } else {
+                            JOptionPane.showMessageDialog(this,
+                                    "Failed to delete customer.",
+                                    "Error",
+                                    JOptionPane.ERROR_MESSAGE);
+                        }
+                    } catch (SQLException ex) {
                         JOptionPane.showMessageDialog(this,
-                                "Failed to delete customer.",
-                                "Error",
-                                JOptionPane.ERROR_MESSAGE);
+                            "Error deleting customer: " + ex.getMessage(),
+                            "Database Error",
+                            JOptionPane.ERROR_MESSAGE);
                     }
                 }
             } else {
@@ -114,7 +137,14 @@ public class CustomerPanel extends JPanel {
             int selectedRow = customerTable.getSelectedRow();
             if (selectedRow != -1) {
                 int customerId = customerIds.get(selectedRow);
-                showCustomerOrders(customerId);
+                try {
+                    showCustomerOrders(customerId);
+                } catch (SQLException ex) {
+                    JOptionPane.showMessageDialog(this,
+                        "Error loading customer orders: " + ex.getMessage(),
+                        "Database Error",
+                        JOptionPane.ERROR_MESSAGE);
+                }
             } else {
                 JOptionPane.showMessageDialog(this,
                         "Please select a customer to view orders.",
@@ -122,10 +152,19 @@ public class CustomerPanel extends JPanel {
                         JOptionPane.WARNING_MESSAGE);
             }
         });
-        refreshButton.addActionListener(e -> loadCustomers());
+        refreshButton.addActionListener(e -> {
+            try {
+                loadCustomers();
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(this,
+                    "Error refreshing customers: " + ex.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+            }
+        });
     }
 
-    private void loadCustomers() {
+    private void loadCustomers() throws SQLException {
         tableModel.setRowCount(0);
         customerIds.clear();
         List<Customer> customers = controller.getAllCustomers();
@@ -228,21 +267,28 @@ public class CustomerPanel extends JPanel {
                     address
             );
 
-            boolean success;
-            if (customer == null) {
-                success = controller.addCustomer(newCustomer) > 0;
-            } else {
-                success = controller.updateCustomer(newCustomer);
-            }
+            try {
+                boolean success;
+                if (customer == null) {
+                    success = controller.addCustomer(newCustomer) > 0;
+                } else {
+                    success = controller.updateCustomer(newCustomer);
+                }
 
-            if (success) {
-                loadCustomers();
-                dialog.dispose();
-            } else {
+                if (success) {
+                    loadCustomers();
+                    dialog.dispose();
+                } else {
+                    JOptionPane.showMessageDialog(dialog,
+                            "Failed to " + (customer == null ? "add" : "update") + " customer.",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (SQLException ex) {
                 JOptionPane.showMessageDialog(dialog,
-                        "Failed to " + (customer == null ? "add" : "update") + " customer.",
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE);
+                    "Database error while " + (customer == null ? "adding" : "updating") + " customer: " + ex.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
             }
         });
 
@@ -258,7 +304,7 @@ public class CustomerPanel extends JPanel {
         dialog.setVisible(true);
     }
 
-    private void showCustomerOrders(int customerId) {
+    private void showCustomerOrders(int customerId) throws SQLException {
         List<model.Order> orders = controller.getCustomerOrders(customerId);
         if (orders.isEmpty()) {
             JOptionPane.showMessageDialog(this,
