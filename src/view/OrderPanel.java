@@ -270,18 +270,21 @@ public class OrderPanel extends JPanel {
         // Get ingredients for this dish
         Map<Integer, Double> requiredIngredients = controller.getDishIngredients(dish.getDishId());
         boolean hasEnoughIngredients = true;
+        int quantity = (int) quantitySpinner.getValue();
 
         for (Map.Entry<Integer, Double> entry : requiredIngredients.entrySet()) {
             Ingredient ingredient = controller.getIngredientById(entry.getKey());
             if (ingredient != null) {
-                String status = ingredient.getQuantityInStock() >= entry.getValue() ? 
+                double requiredPerDish = entry.getValue();
+                double totalRequired = requiredPerDish * quantity;
+                String status = ingredient.getQuantityInStock() >= totalRequired ? 
                     "Available" : "Insufficient Stock";
                 if (status.equals("Insufficient Stock")) {
                     hasEnoughIngredients = false;
                 }
                 Object[] row = {
                     ingredient.getName(),
-                    String.format("%.2f %s", entry.getValue(), ingredient.getUnitName()),
+                    String.format("%.2f %s", totalRequired, ingredient.getUnitName()),
                     String.format("%.2f %s", ingredient.getQuantityInStock(), ingredient.getUnitName()),
                     status
                 };
@@ -394,7 +397,7 @@ public class OrderPanel extends JPanel {
         
         // Create order type panel
         JPanel typePanel = new JPanel(new BorderLayout());
-        String[] orderTypes = {"Dine In", "Take Out", "Delivery"};
+        String[] orderTypes = {"Dine-In", "Takeout", "Delivery"};
         JComboBox<String> typeCombo = new JComboBox<>(orderTypes);
         typePanel.add(new JLabel("Order Type:"), BorderLayout.WEST);
         typePanel.add(typeCombo, BorderLayout.CENTER);
@@ -428,7 +431,7 @@ public class OrderPanel extends JPanel {
             Order order = new Order();
             order.setCustomerId(selectedCustomer.getCustomerId());
             order.setOrderType(orderType);
-            order.setOrderStatus("Pending");
+            order.setOrderStatus("In Progress");
             order.setPaymentStatus("Pending");
             
             // Create list of employee IDs
