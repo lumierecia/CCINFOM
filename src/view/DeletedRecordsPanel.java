@@ -6,13 +6,12 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
-import java.sql.SQLException;
 
 public class DeletedRecordsPanel extends JPanel {
     private final RestaurantController controller;
     private final JTabbedPane tabbedPane;
     private final MainFrame parentFrame;  // Add reference to parent frame
-
+    
     // Tables for each type of deleted record
     private JTable deletedCustomersTable;
     private JTable deletedOrdersTable;
@@ -24,26 +23,26 @@ public class DeletedRecordsPanel extends JPanel {
         this.controller = controller;
         this.parentFrame = parentFrame;
         setLayout(new BorderLayout());
-
+        
         // Create top panel with back button
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton backButton = new JButton("Back to Main");
         backButton.addActionListener(e -> parentFrame.showMainPanel());
         topPanel.add(backButton);
         add(topPanel, BorderLayout.NORTH);
-
+        
         // Create tabbed pane
         tabbedPane = new JTabbedPane();
-
+        
         // Initialize tabs
         initCustomersTab();
         initOrdersTab();
         initEmployeesTab();
         initSuppliersTab();
         initInventoryTab();
-
+        
         add(tabbedPane, BorderLayout.CENTER);
-
+        
         // Add refresh button at the bottom
         JButton refreshAllButton = new JButton("Refresh All");
         refreshAllButton.addActionListener(e -> refreshAllTables());
@@ -52,7 +51,7 @@ public class DeletedRecordsPanel extends JPanel {
 
     private void initCustomersTab() {
         JPanel panel = new JPanel(new BorderLayout());
-
+        
         // Create table
         String[] columns = {"ID", "Name", "Email", "Phone", "Address"};
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
@@ -62,25 +61,25 @@ public class DeletedRecordsPanel extends JPanel {
             }
         };
         deletedCustomersTable = new JTable(model);
-
+        
         // Add table to scroll pane
         JScrollPane scrollPane = new JScrollPane(deletedCustomersTable);
         panel.add(scrollPane, BorderLayout.CENTER);
-
+        
         // Add restore button
         JButton restoreButton = new JButton("Restore Selected");
         restoreButton.addActionListener(e -> restoreSelectedCustomer());
-
+        
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(restoreButton);
         panel.add(buttonPanel, BorderLayout.SOUTH);
-
+        
         tabbedPane.addTab("Customers", panel);
     }
 
     private void initOrdersTab() {
         JPanel panel = new JPanel(new BorderLayout());
-
+        
         // Create table
         String[] columns = {"Order ID", "Customer", "Type", "Status", "Total", "Date"};
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
@@ -90,25 +89,25 @@ public class DeletedRecordsPanel extends JPanel {
             }
         };
         deletedOrdersTable = new JTable(model);
-
+        
         // Add table to scroll pane
         JScrollPane scrollPane = new JScrollPane(deletedOrdersTable);
         panel.add(scrollPane, BorderLayout.CENTER);
-
+        
         // Add restore button
         JButton restoreButton = new JButton("Restore Selected");
         restoreButton.addActionListener(e -> restoreSelectedOrder());
-
+        
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(restoreButton);
         panel.add(buttonPanel, BorderLayout.SOUTH);
-
+        
         tabbedPane.addTab("Orders", panel);
     }
 
     private void initEmployeesTab() {
         JPanel panel = new JPanel(new BorderLayout());
-
+        
         // Create table
         String[] columns = {"ID", "Name", "Role", "Shift"};
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
@@ -118,25 +117,25 @@ public class DeletedRecordsPanel extends JPanel {
             }
         };
         deletedEmployeesTable = new JTable(model);
-
+        
         // Add table to scroll pane
         JScrollPane scrollPane = new JScrollPane(deletedEmployeesTable);
         panel.add(scrollPane, BorderLayout.CENTER);
-
+        
         // Add restore button
         JButton restoreButton = new JButton("Restore Selected");
         restoreButton.addActionListener(e -> restoreSelectedEmployee());
-
+        
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(restoreButton);
         panel.add(buttonPanel, BorderLayout.SOUTH);
-
+        
         tabbedPane.addTab("Employees", panel);
     }
 
     private void initSuppliersTab() {
         JPanel panel = new JPanel(new BorderLayout());
-
+        
         // Create table
         String[] columns = {"ID", "Name", "Contact Person", "Email", "Phone"};
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
@@ -146,25 +145,25 @@ public class DeletedRecordsPanel extends JPanel {
             }
         };
         deletedSuppliersTable = new JTable(model);
-
+        
         // Add table to scroll pane
         JScrollPane scrollPane = new JScrollPane(deletedSuppliersTable);
         panel.add(scrollPane, BorderLayout.CENTER);
-
+        
         // Add restore button
         JButton restoreButton = new JButton("Restore Selected");
         restoreButton.addActionListener(e -> restoreSelectedSupplier());
-
+        
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(restoreButton);
         panel.add(buttonPanel, BorderLayout.SOUTH);
-
+        
         tabbedPane.addTab("Suppliers", panel);
     }
 
     private void initInventoryTab() {
         JPanel panel = new JPanel(new BorderLayout());
-
+        
         // Create table
         String[] columns = {"ID", "Name", "Category", "Make Price", "Sell Price", "Quantity"};
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
@@ -174,19 +173,19 @@ public class DeletedRecordsPanel extends JPanel {
             }
         };
         deletedInventoryTable = new JTable(model);
-
+        
         // Add table to scroll pane
         JScrollPane scrollPane = new JScrollPane(deletedInventoryTable);
         panel.add(scrollPane, BorderLayout.CENTER);
-
+        
         // Add restore button
         JButton restoreButton = new JButton("Restore Selected");
         restoreButton.addActionListener(e -> restoreSelectedInventoryItem());
-
+        
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(restoreButton);
         panel.add(buttonPanel, BorderLayout.SOUTH);
-
+        
         tabbedPane.addTab("Inventory", panel);
     }
 
@@ -238,16 +237,9 @@ public class DeletedRecordsPanel extends JPanel {
         int selectedRow = deletedInventoryTable.getSelectedRow();
         if (selectedRow >= 0) {
             int productId = (int) deletedInventoryTable.getValueAt(selectedRow, 0);
-            try {
-                if (controller.restoreInventoryItem(productId)) {
-                    refreshInventoryTable();
-                    JOptionPane.showMessageDialog(this, "Inventory item restored successfully!");
-                }
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Error restoring inventory item: " + ex.getMessage(),
-                        "Database Error",
-                        JOptionPane.ERROR_MESSAGE);
+            if (controller.restoreInventoryItem(productId)) {
+                refreshInventoryTable();
+                JOptionPane.showMessageDialog(this, "Inventory item restored successfully!");
             }
         }
     }
@@ -266,11 +258,11 @@ public class DeletedRecordsPanel extends JPanel {
         List<Customer> deletedCustomers = controller.getDeletedCustomers();
         for (Customer customer : deletedCustomers) {
             model.addRow(new Object[]{
-                    customer.getCustomerId(),
-                    customer.getFirstName() + " " + customer.getLastName(),
-                    customer.getEmail(),
-                    customer.getPhone(),
-                    customer.getAddress()
+                customer.getCustomerId(),
+                customer.getFirstName() + " " + customer.getLastName(),
+                customer.getEmail(),
+                customer.getPhone(),
+                customer.getAddress()
             });
         }
     }
@@ -281,12 +273,12 @@ public class DeletedRecordsPanel extends JPanel {
         List<Order> deletedOrders = controller.getDeletedOrders();
         for (Order order : deletedOrders) {
             model.addRow(new Object[]{
-                    order.getOrderId(),
-                    order.getCustomerName(),
-                    order.getOrderType(),
-                    order.getOrderStatus(),
-                    order.getTotalAmount(),
-                    order.getOrderDateTime()
+                order.getOrderId(),
+                order.getCustomerName(),
+                order.getOrderType(),
+                order.getOrderStatus(),
+                order.getTotalAmount(),
+                order.getOrderDateTime()
             });
         }
     }
@@ -297,10 +289,10 @@ public class DeletedRecordsPanel extends JPanel {
         List<Employee> deletedEmployees = controller.getDeletedEmployees();
         for (Employee employee : deletedEmployees) {
             model.addRow(new Object[]{
-                    employee.getEmployeeId(),
-                    employee.getFirstName() + " " + employee.getLastName(),
-                    employee.getRoleName(),
-                    employee.getShiftType()
+                employee.getEmployeeId(),
+                employee.getFirstName() + " " + employee.getLastName(),
+                employee.getRoleName(),
+                employee.getShiftType()
             });
         }
     }
@@ -311,11 +303,11 @@ public class DeletedRecordsPanel extends JPanel {
         List<Supplier> deletedSuppliers = controller.getDeletedSuppliers();
         for (Supplier supplier : deletedSuppliers) {
             model.addRow(new Object[]{
-                    supplier.getSupplierId(),
-                    supplier.getName(),
-                    supplier.getContactPerson(),
-                    supplier.getEmail(),
-                    supplier.getPhone()
+                supplier.getSupplierId(),
+                supplier.getName(),
+                supplier.getContactPerson(),
+                supplier.getEmail(),
+                supplier.getPhone()
             });
         }
     }
@@ -323,23 +315,16 @@ public class DeletedRecordsPanel extends JPanel {
     private void refreshInventoryTable() {
         DefaultTableModel model = (DefaultTableModel) deletedInventoryTable.getModel();
         model.setRowCount(0);
-        try {
-            List<Inventory> deletedItems = controller.getDeletedInventoryItems();
-            for (Inventory item : deletedItems) {
-                model.addRow(new Object[]{
-                        item.getProductId(),
-                        item.getProductName(),
-                        item.getCategoryName(),
-                        item.getMakePrice(),
-                        item.getSellPrice(),
-                        item.getQuantity()
-                });
-            }
-        } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this,
-                    "Error loading deleted inventory items: " + ex.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
+        List<Inventory> deletedItems = controller.getDeletedInventoryItems();
+        for (Inventory item : deletedItems) {
+            model.addRow(new Object[]{
+                item.getProductId(),
+                item.getProductName(),
+                item.getCategoryName(),
+                item.getMakePrice(),
+                item.getSellPrice(),
+                item.getQuantity()
+            });
         }
     }
 } 

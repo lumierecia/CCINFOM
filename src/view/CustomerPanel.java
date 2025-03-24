@@ -2,13 +2,11 @@ package view;
 
 import controller.RestaurantController;
 import model.Customer;
-import util.StyledComponents;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -28,26 +26,17 @@ public class CustomerPanel extends JPanel {
         this.controller = controller;
         setLayout(new BorderLayout());
         initComponents();
-        try {
-            loadCustomers();
-        } catch (SQLException e) {
-            SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(this,
-                    "Error loading customers: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
-            });
-        }
+        loadCustomers();
     }
 
     private void initComponents() {
         // Create toolbar
         JPanel toolBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        addButton = StyledComponents.createStyledButton("Add Customer", new Color(40, 167, 69));
-        editButton = StyledComponents.createStyledButton("Edit Customer", new Color(255, 193, 7));
-        deleteButton = StyledComponents.createStyledButton("Delete Customer", new Color(220, 53, 69));
-        viewOrdersButton = StyledComponents.createStyledButton("View Orders", new Color(70, 130, 180));
-        refreshButton = StyledComponents.createStyledButton("Refresh", new Color(108, 117, 125));
+        addButton = createStyledButton("Add Customer", new Color(40, 167, 69));
+        editButton = createStyledButton("Edit Customer", new Color(255, 193, 7));
+        deleteButton = createStyledButton("Delete Customer", new Color(220, 53, 69));
+        viewOrdersButton = createStyledButton("View Orders", new Color(70, 130, 180));
+        refreshButton = createStyledButton("Refresh", new Color(108, 117, 125));
 
         toolBar.add(addButton);
         toolBar.add(editButton);
@@ -56,7 +45,8 @@ public class CustomerPanel extends JPanel {
         toolBar.add(refreshButton);
 
         // Create help button
-        helpButton = StyledComponents.createStyledButton("Help", new Color(108, 117, 125));
+        helpButton = new JButton("Help");
+        helpButton.setIcon(new ImageIcon(getClass().getResource("/icons/help.png")));
         helpButton.addActionListener(e -> showHelp());
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         topPanel.add(helpButton);
@@ -82,23 +72,16 @@ public class CustomerPanel extends JPanel {
         editButton.addActionListener(e -> {
             int selectedRow = customerTable.getSelectedRow();
             if (selectedRow != -1) {
-                try {
-                    int customerId = customerIds.get(selectedRow);
-                    Customer customer = controller.getCustomerById(customerId);
-                    if (customer != null) {
-                        showCustomerDialog(customer);
-                    }
-                } catch (SQLException ex) {
-                    JOptionPane.showMessageDialog(this,
-                        "Error loading customer details: " + ex.getMessage(),
-                        "Database Error",
-                        JOptionPane.ERROR_MESSAGE);
+                int customerId = customerIds.get(selectedRow);
+                Customer customer = controller.getCustomerById(customerId);
+                if (customer != null) {
+                    showCustomerDialog(customer);
                 }
             } else {
                 JOptionPane.showMessageDialog(this,
-                        "Please select a customer to edit.",
-                        "No Selection",
-                        JOptionPane.WARNING_MESSAGE);
+                    "Please select a customer to edit.",
+                    "No Selection",
+                    JOptionPane.WARNING_MESSAGE);
             }
         });
         deleteButton.addActionListener(e -> {
@@ -106,76 +89,53 @@ public class CustomerPanel extends JPanel {
             if (selectedRow != -1) {
                 int customerId = customerIds.get(selectedRow);
                 int confirm = JOptionPane.showConfirmDialog(this,
-                        "Are you sure you want to delete this customer?",
-                        "Confirm Delete",
-                        JOptionPane.YES_NO_OPTION);
+                    "Are you sure you want to delete this customer?",
+                    "Confirm Delete",
+                    JOptionPane.YES_NO_OPTION);
                 if (confirm == JOptionPane.YES_OPTION) {
-                    try {
-                        if (controller.deleteCustomer(customerId)) {
-                            loadCustomers();
-                        } else {
-                            JOptionPane.showMessageDialog(this,
-                                    "Failed to delete customer.",
-                                    "Error",
-                                    JOptionPane.ERROR_MESSAGE);
-                        }
-                    } catch (SQLException ex) {
+                    if (controller.deleteCustomer(customerId)) {
+                        loadCustomers();
+                    } else {
                         JOptionPane.showMessageDialog(this,
-                            "Error deleting customer: " + ex.getMessage(),
-                            "Database Error",
+                            "Failed to delete customer.",
+                            "Error",
                             JOptionPane.ERROR_MESSAGE);
                     }
                 }
             } else {
                 JOptionPane.showMessageDialog(this,
-                        "Please select a customer to delete.",
-                        "No Selection",
-                        JOptionPane.WARNING_MESSAGE);
+                    "Please select a customer to delete.",
+                    "No Selection",
+                    JOptionPane.WARNING_MESSAGE);
             }
         });
         viewOrdersButton.addActionListener(e -> {
             int selectedRow = customerTable.getSelectedRow();
             if (selectedRow != -1) {
                 int customerId = customerIds.get(selectedRow);
-                try {
-                    showCustomerOrders(customerId);
-                } catch (SQLException ex) {
-                    JOptionPane.showMessageDialog(this,
-                        "Error loading customer orders: " + ex.getMessage(),
-                        "Database Error",
-                        JOptionPane.ERROR_MESSAGE);
-                }
+                showCustomerOrders(customerId);
             } else {
                 JOptionPane.showMessageDialog(this,
-                        "Please select a customer to view orders.",
-                        "No Selection",
-                        JOptionPane.WARNING_MESSAGE);
+                    "Please select a customer to view orders.",
+                    "No Selection",
+                    JOptionPane.WARNING_MESSAGE);
             }
         });
-        refreshButton.addActionListener(e -> {
-            try {
-                loadCustomers();
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this,
-                    "Error refreshing customers: " + ex.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
-            }
-        });
+        refreshButton.addActionListener(e -> loadCustomers());
     }
 
-    private void loadCustomers() throws SQLException {
+    private void loadCustomers() {
         tableModel.setRowCount(0);
         customerIds.clear();
         List<Customer> customers = controller.getAllCustomers();
         for (Customer customer : customers) {
             customerIds.add(customer.getCustomerId());
             Object[] row = {
-                    customer.getFirstName(),
-                    customer.getLastName(),
-                    customer.getEmail(),
-                    customer.getPhone(),
-                    customer.getAddress()
+                customer.getFirstName(),
+                customer.getLastName(),
+                customer.getEmail(),
+                customer.getPhone(),
+                customer.getAddress()
             };
             tableModel.addRow(row);
         }
@@ -183,8 +143,8 @@ public class CustomerPanel extends JPanel {
 
     private void showCustomerDialog(Customer customer) {
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-                customer == null ? "Add Customer" : "Edit Customer",
-                true);
+            customer == null ? "Add Customer" : "Edit Customer",
+            true);
         dialog.setLayout(new BorderLayout());
 
         // Create form panel
@@ -252,42 +212,35 @@ public class CustomerPanel extends JPanel {
 
             if (firstName.isEmpty() || lastName.isEmpty() || email.isEmpty() || phone.isEmpty()) {
                 JOptionPane.showMessageDialog(dialog,
-                        "Please fill in all required fields.",
-                        "Missing Information",
-                        JOptionPane.WARNING_MESSAGE);
+                    "Please fill in all required fields.",
+                    "Missing Information",
+                    JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
             Customer newCustomer = new Customer(
-                    customer != null ? customer.getCustomerId() : 0,
-                    firstName,
-                    lastName,
-                    email,
-                    phone,
-                    address
+                customer != null ? customer.getCustomerId() : 0,
+                firstName,
+                lastName,
+                email,
+                phone,
+                address
             );
 
-            try {
-                boolean success;
-                if (customer == null) {
-                    success = controller.addCustomer(newCustomer) > 0;
-                } else {
-                    success = controller.updateCustomer(newCustomer);
-                }
+            boolean success;
+            if (customer == null) {
+                success = controller.addCustomer(newCustomer) > 0;
+            } else {
+                success = controller.updateCustomer(newCustomer);
+            }
 
-                if (success) {
-                    loadCustomers();
-                    dialog.dispose();
-                } else {
-                    JOptionPane.showMessageDialog(dialog,
-                            "Failed to " + (customer == null ? "add" : "update") + " customer.",
-                            "Error",
-                            JOptionPane.ERROR_MESSAGE);
-                }
-            } catch (SQLException ex) {
+            if (success) {
+                loadCustomers();
+                dialog.dispose();
+            } else {
                 JOptionPane.showMessageDialog(dialog,
-                    "Database error while " + (customer == null ? "adding" : "updating") + " customer: " + ex.getMessage(),
-                    "Database Error",
+                    "Failed to " + (customer == null ? "add" : "update") + " customer.",
+                    "Error",
                     JOptionPane.ERROR_MESSAGE);
             }
         });
@@ -304,62 +257,43 @@ public class CustomerPanel extends JPanel {
         dialog.setVisible(true);
     }
 
-    private void showCustomerOrders(int customerId) throws SQLException {
-        List<model.Order> orders = controller.getCustomerOrders(customerId);
-        if (orders.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    "No orders found for this customer.",
-                    "No Orders",
-                    JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
-
-        // Create dialog to display orders
+    private void showCustomerOrders(int customerId) {
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-                "Customer Orders",
-                true);
+            "Order History", true);
         dialog.setLayout(new BorderLayout());
 
-        // Create table model
-        String[] columnNames = {"Order ID", "Date", "Status", "Total"};
+        // Create table
+        String[] columnNames = {"Order ID", "Date", "Total", "Status"};
         DefaultTableModel orderModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
             }
         };
+        JTable orderTable = new JTable(orderModel);
+        JScrollPane scrollPane = new JScrollPane(orderTable);
 
-        // Add orders to table
+        // Load orders
+        List<model.Order> orders = controller.getCustomerOrders(customerId);
         for (model.Order order : orders) {
-            double total = 0.0;
-            try {
-                total = controller.calculateOrderTotal(order.getOrderId());
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Error calculating order total: " + ex.getMessage(),
-                        "Database Error",
-                        JOptionPane.ERROR_MESSAGE);
-            }
             Object[] row = {
-                    order.getOrderId(),
-                    order.getOrderDateTime(),
-                    order.getOrderStatus(),
-                    String.format("$%.2f", total)
+                order.getOrderId(),
+                order.getOrderDateTime(),
+                String.format("$%.2f", controller.calculateOrderTotal(order.getOrderId())),
+                order.getOrderStatus()
             };
             orderModel.addRow(row);
         }
 
-        // Create table and scroll pane
-        JTable orderTable = new JTable(orderModel);
-        JScrollPane scrollPane = new JScrollPane(orderTable);
-
         // Add close button
         JButton closeButton = new JButton("Close");
         closeButton.addActionListener(e -> dialog.dispose());
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.add(closeButton);
 
         // Add components to dialog
         dialog.add(scrollPane, BorderLayout.CENTER);
-        dialog.add(closeButton, BorderLayout.SOUTH);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
 
         // Show dialog
         dialog.setSize(600, 400);
@@ -368,41 +302,34 @@ public class CustomerPanel extends JPanel {
     }
 
     private void showHelp() {
-        String helpText = """
-            Customer Management Help:
-            
-            1. View Customers:
-               - The table shows all customers in the system
-               - Click on a customer to select them
-            
-            2. Add Customer:
-               - Click the "Add Customer" button
-               - Fill in all required fields
-               - Click "Add" to save
-            
-            3. Edit Customer:
-               - Select a customer from the table
-               - Click "Edit Customer"
-               - Modify the fields
-               - Click "Save" to update
-            
-            4. Delete Customer:
-               - Select a customer from the table
-               - Click "Delete Customer"
-               - Confirm the deletion
-            
-            5. View Orders:
-               - Select a customer from the table
-               - Click "View Orders"
-               - A dialog will show all orders for that customer
-            
-            6. Refresh:
-               - Click "Refresh" to update the customer list
-            """;
+        HelpDialog helpDialog = new HelpDialog(SwingUtilities.getWindowAncestor(this), "Customers");
+        helpDialog.setVisible(true);
+    }
 
-        JOptionPane.showMessageDialog(this,
-                helpText,
-                "Customer Management Help",
-                JOptionPane.INFORMATION_MESSAGE);
+    private JButton createStyledButton(String text, Color backgroundColor) {
+        JButton button = new JButton(text);
+        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
+        button.setBackground(backgroundColor);
+        button.setForeground(Color.BLACK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+
+        // Add hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(backgroundColor.brighter());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(backgroundColor);
+            }
+        });
+
+        return button;
     }
 } 

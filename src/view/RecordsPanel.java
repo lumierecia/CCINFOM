@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
-import java.sql.SQLException;
 
 public class RecordsPanel extends JPanel {
     private RestaurantController controller;
@@ -34,29 +33,29 @@ public class RecordsPanel extends JPanel {
         // Create toolbar
         JPanel toolBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         toolBar.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
+        
         // Add buttons with consistent styling
         JButton addButton = createStyledButton("Add Item", new Color(40, 167, 69));
         addButton.addActionListener(e -> showAddDialog());
-
+        
         JButton editButton = createStyledButton("Edit Item", new Color(255, 193, 7));
         editButton.addActionListener(e -> showEditDialog());
-
+        
         JButton deleteButton = createStyledButton("Delete Item", new Color(220, 53, 69));
         deleteButton.addActionListener(e -> deleteSelectedItem());
-
+        
         JButton viewRecipeButton = createStyledButton("View Recipe", new Color(70, 130, 180));
         viewRecipeButton.addActionListener(e -> showRecipeDialog());
-
+        
         JButton helpButton = createStyledButton("Help", new Color(108, 117, 125));
         helpButton.addActionListener(e -> showHelpDialog());
-
+        
         toolBar.add(addButton);
         toolBar.add(editButton);
         toolBar.add(deleteButton);
         toolBar.add(viewRecipeButton);
         toolBar.add(helpButton);
-
+        
         add(toolBar, BorderLayout.NORTH);
 
         // Initialize table with enhanced tooltip
@@ -82,8 +81,8 @@ public class RecordsPanel extends JPanel {
         button.setForeground(Color.BLACK);
         button.setFocusPainted(false);
         button.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(backgroundColor.darker(), 1),
-                BorderFactory.createEmptyBorder(8, 15, 8, 15)
+            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
         ));
 
         // Add hover effect
@@ -105,24 +104,17 @@ public class RecordsPanel extends JPanel {
     private void loadData() {
         model.setRowCount(0);
         itemIds.clear();
-        try {
-            List<Inventory> items = controller.getAllInventoryItems();
-            for (Inventory item : items) {
-                itemIds.add(item.getProductId());
-                model.addRow(new Object[]{
-                        item.getProductName(),
-                        item.getCategoryName(),
-                        item.getMakePrice(),
-                        item.getSellPrice(),
-                        item.getQuantity(),
-                        item.getQuantity() == 0 ? "Unavailable" : "Available"
-                });
-            }
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Error loading inventory items: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
+        List<Inventory> items = controller.getAllInventoryItems();
+        for (Inventory item : items) {
+            itemIds.add(item.getProductId());
+            model.addRow(new Object[]{
+                item.getProductName(),
+                item.getCategoryName(),
+                item.getMakePrice(),
+                item.getSellPrice(),
+                item.getQuantity(),
+                item.getQuantity() == 0 ? "Unavailable" : "Available"
+            });
         }
     }
 
@@ -275,118 +267,107 @@ public class RecordsPanel extends JPanel {
     }
 
     private void showAddDialog() {
-        try {
-            JTextField nameField = new JTextField(20);
-            JComboBox<String> categoryField = new JComboBox<>(controller.getAllCategories().toArray(new String[0]));
-            JTextField makePriceField = new JTextField(10);
-            JTextField sellPriceField = new JTextField(10);
-            JTextField quantityField = new JTextField(10);
-            JSpinner employeeSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 99999, 1));
-            JTextArea recipeField = new JTextArea(5, 20);
-            recipeField.setLineWrap(true);
-            recipeField.setWrapStyleWord(true);
-            JScrollPane recipeScrollPane = new JScrollPane(recipeField);
+        JTextField nameField = new JTextField(20);
+        JComboBox<String> categoryField = new JComboBox<>(controller.getAllCategories().toArray(new String[0]));
+        JTextField makePriceField = new JTextField(10);
+        JTextField sellPriceField = new JTextField(10);
+        JTextField quantityField = new JTextField(10);
+        JTextArea recipeField = new JTextArea(5, 20);
+        recipeField.setLineWrap(true);
+        recipeField.setWrapStyleWord(true);
+        JScrollPane recipeScrollPane = new JScrollPane(recipeField);
 
-            JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
-            panel.add(new JLabel("Name:"));
-            panel.add(nameField);
-            panel.add(new JLabel("Category:"));
-            panel.add(categoryField);
-            panel.add(new JLabel("Make Price:"));
-            panel.add(makePriceField);
-            panel.add(new JLabel("Sell Price:"));
-            panel.add(sellPriceField);
-            panel.add(new JLabel("Quantity:"));
-            panel.add(quantityField);
-            panel.add(new JLabel("Employee ID:"));
-            panel.add(employeeSpinner);
-            panel.add(new JLabel("Recipe:"));
-            panel.add(recipeScrollPane);
+        JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
+        panel.add(new JLabel("Name:"));
+        panel.add(nameField);
+        panel.add(new JLabel("Category:"));
+        panel.add(categoryField);
+        panel.add(new JLabel("Make Price:"));
+        panel.add(makePriceField);
+        panel.add(new JLabel("Sell Price:"));
+        panel.add(sellPriceField);
+        panel.add(new JLabel("Quantity:"));
+        panel.add(quantityField);
+        panel.add(new JLabel("Recipe:"));
+        panel.add(recipeScrollPane);
 
-            int result = JOptionPane.showConfirmDialog(this, panel,
-                    "Add New Item", JOptionPane.OK_CANCEL_OPTION);
-            if (result == JOptionPane.OK_OPTION) {
-                try {
-                    String name = nameField.getText().trim();
-                    if (name.isEmpty()) {
-                        JOptionPane.showMessageDialog(this,
-                                "Please enter a name for the item.",
-                                "Invalid Input",
-                                JOptionPane.ERROR_MESSAGE);
-                        return;
-                    }
-
-                    String category = (String) categoryField.getSelectedItem();
-                    if (category == null) {
-                        JOptionPane.showMessageDialog(this,
-                                "Please select a category.",
-                                "Invalid Input",
-                                JOptionPane.ERROR_MESSAGE);
-                        return;
-                    }
-
-                    double makePrice = Double.parseDouble(makePriceField.getText().trim());
-                    if (makePrice <= 0) {
-                        JOptionPane.showMessageDialog(this,
-                                "Make price must be greater than 0.",
-                                "Invalid Input",
-                                JOptionPane.ERROR_MESSAGE);
-                        return;
-                    }
-
-                    double sellPrice = Double.parseDouble(sellPriceField.getText().trim());
-                    if (sellPrice <= 0) {
-                        JOptionPane.showMessageDialog(this,
-                                "Sell price must be greater than 0.",
-                                "Invalid Input",
-                                JOptionPane.ERROR_MESSAGE);
-                        return;
-                    }
-
-                    if (sellPrice <= makePrice) {
-                        JOptionPane.showMessageDialog(this,
-                                "Sell price must be greater than make price.",
-                                "Invalid Input",
-                                JOptionPane.ERROR_MESSAGE);
-                        return;
-                    }
-
-                    int quantity = Integer.parseInt(quantityField.getText().trim());
-                    if (quantity < 0) {
-                        JOptionPane.showMessageDialog(this,
-                                "Quantity cannot be negative.",
-                                "Invalid Input",
-                                JOptionPane.ERROR_MESSAGE);
-                        return;
-                    }
-
-                    int employeeId = (Integer) employeeSpinner.getValue();
-                    String recipe = recipeField.getText().trim();
-
-                    if (controller.addInventoryItem(name, category, makePrice, sellPrice, quantity, recipe, employeeId)) {
-                        loadData();
-                        JOptionPane.showMessageDialog(this,
-                                "Item added successfully!",
-                                "Success",
-                                JOptionPane.INFORMATION_MESSAGE);
-                    } else {
-                        JOptionPane.showMessageDialog(this,
-                                "Failed to add item.",
-                                "Error",
-                                JOptionPane.ERROR_MESSAGE);
-                    }
-                } catch (SQLException ex) {
+        int result = JOptionPane.showConfirmDialog(this, panel,
+                "Add New Item", JOptionPane.OK_CANCEL_OPTION);
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                String name = nameField.getText().trim();
+                if (name.isEmpty()) {
                     JOptionPane.showMessageDialog(this,
-                            "Database error: " + ex.getMessage(),
+                            "Please enter a name for the item.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                String category = (String) categoryField.getSelectedItem();
+                if (category == null) {
+                    JOptionPane.showMessageDialog(this,
+                            "Please select a category.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                double makePrice = Double.parseDouble(makePriceField.getText().trim());
+                if (makePrice <= 0) {
+                    JOptionPane.showMessageDialog(this,
+                            "Make price must be greater than 0.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                double sellPrice = Double.parseDouble(sellPriceField.getText().trim());
+                if (sellPrice <= 0) {
+                    JOptionPane.showMessageDialog(this,
+                            "Sell price must be greater than 0.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                if (sellPrice <= makePrice) {
+                    JOptionPane.showMessageDialog(this,
+                            "Sell price must be greater than make price.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                int quantity = Integer.parseInt(quantityField.getText().trim());
+                if (quantity < 0) {
+                    JOptionPane.showMessageDialog(this,
+                            "Quantity cannot be negative.",
+                            "Invalid Input",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                String recipe = recipeField.getText().trim();
+
+                if (controller.addInventoryItem(name, category, makePrice, sellPrice, quantity, recipe)) {
+                    loadData();
+                    JOptionPane.showMessageDialog(this,
+                            "Item added successfully!",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                            "Failed to add item.",
                             "Error",
                             JOptionPane.ERROR_MESSAGE);
                 }
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this,
+                        "Please enter valid numbers for prices and quantity.",
+                        "Invalid Input",
+                        JOptionPane.ERROR_MESSAGE);
             }
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Error loading categories: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -400,82 +381,70 @@ public class RecordsPanel extends JPanel {
             return;
         }
 
-        try {
-            int id = itemIds.get(selectedRow);
-            Inventory item = controller.getInventoryItemById(id);
-            if (item == null) {
-                JOptionPane.showMessageDialog(this,
-                        "Failed to load item details.",
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE);
-                return;
-            }
+        int id = itemIds.get(selectedRow);
+        Inventory item = controller.getInventoryItemById(id);
+        if (item == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Failed to load item details.",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
 
-            JTextField nameField = new JTextField(item.getProductName(), 20);
-            JComboBox<String> categoryField = new JComboBox<>(controller.getAllCategories().toArray(new String[0]));
-            categoryField.setSelectedItem(item.getCategoryName());
-            JTextField makePriceField = new JTextField(String.valueOf(item.getMakePrice()), 10);
-            JTextField sellPriceField = new JTextField(String.valueOf(item.getSellPrice()), 10);
-            JTextField quantityField = new JTextField(String.valueOf(item.getQuantity()), 10);
-            JTextArea recipeField = new JTextArea(item.getRecipeInstructions(), 5, 20);
-            recipeField.setLineWrap(true);
-            recipeField.setWrapStyleWord(true);
-            JScrollPane recipeScrollPane = new JScrollPane(recipeField);
+        JTextField nameField = new JTextField(item.getProductName(), 20);
+        JComboBox<String> categoryField = new JComboBox<>(controller.getAllCategories().toArray(new String[0]));
+        categoryField.setSelectedItem(item.getCategoryName());
+        JTextField makePriceField = new JTextField(String.valueOf(item.getMakePrice()), 10);
+        JTextField sellPriceField = new JTextField(String.valueOf(item.getSellPrice()), 10);
+        JTextField quantityField = new JTextField(String.valueOf(item.getQuantity()), 10);
+        JTextArea recipeField = new JTextArea(item.getRecipeInstructions(), 5, 20);
+        recipeField.setLineWrap(true);
+        recipeField.setWrapStyleWord(true);
+        JScrollPane recipeScrollPane = new JScrollPane(recipeField);
 
-            JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
-            panel.add(new JLabel("Name:"));
-            panel.add(nameField);
-            panel.add(new JLabel("Category:"));
-            panel.add(categoryField);
-            panel.add(new JLabel("Make Price:"));
-            panel.add(makePriceField);
-            panel.add(new JLabel("Sell Price:"));
-            panel.add(sellPriceField);
-            panel.add(new JLabel("Quantity:"));
-            panel.add(quantityField);
-            panel.add(new JLabel("Recipe:"));
-            panel.add(recipeScrollPane);
+        JPanel panel = new JPanel(new GridLayout(0, 2, 5, 5));
+        panel.add(new JLabel("Name:"));
+        panel.add(nameField);
+        panel.add(new JLabel("Category:"));
+        panel.add(categoryField);
+        panel.add(new JLabel("Make Price:"));
+        panel.add(makePriceField);
+        panel.add(new JLabel("Sell Price:"));
+        panel.add(sellPriceField);
+        panel.add(new JLabel("Quantity:"));
+        panel.add(quantityField);
+        panel.add(new JLabel("Recipe:"));
+        panel.add(recipeScrollPane);
 
-            int result = JOptionPane.showConfirmDialog(this, panel,
-                    "Edit Item", JOptionPane.OK_CANCEL_OPTION);
-            if (result == JOptionPane.OK_OPTION) {
-                try {
-                    String name = nameField.getText();
-                    String category = (String) categoryField.getSelectedItem();
-                    double makePrice = Double.parseDouble(makePriceField.getText());
-                    double sellPrice = Double.parseDouble(sellPriceField.getText());
-                    int quantity = Integer.parseInt(quantityField.getText());
-                    String recipe = recipeField.getText();
+        int result = JOptionPane.showConfirmDialog(this, panel,
+                "Edit Item", JOptionPane.OK_CANCEL_OPTION);
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                String name = nameField.getText();
+                String category = (String) categoryField.getSelectedItem();
+                double makePrice = Double.parseDouble(makePriceField.getText());
+                double sellPrice = Double.parseDouble(sellPriceField.getText());
+                int quantity = Integer.parseInt(quantityField.getText());
+                String recipe = recipeField.getText();
 
-                    if (controller.updateInventoryItem(id, name, category, makePrice, sellPrice, quantity, recipe)) {
-                        loadData();
-                        JOptionPane.showMessageDialog(this,
-                                "Item updated successfully!",
-                                "Success",
-                                JOptionPane.INFORMATION_MESSAGE);
-                    } else {
-                        JOptionPane.showMessageDialog(this,
-                                "Failed to update item.",
-                                "Error",
-                                JOptionPane.ERROR_MESSAGE);
-                    }
-                } catch (SQLException ex) {
+                if (controller.updateInventoryItem(id, name, category, makePrice, sellPrice, quantity, recipe)) {
+                    loadData();
                     JOptionPane.showMessageDialog(this,
-                            "Database error: " + ex.getMessage(),
+                            "Item updated successfully!",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(this,
+                            "Failed to update item.",
                             "Error",
                             JOptionPane.ERROR_MESSAGE);
-                } catch (NumberFormatException e) {
-                    JOptionPane.showMessageDialog(this,
-                            "Please enter valid numbers for prices and quantity.",
-                            "Invalid Input",
-                            JOptionPane.ERROR_MESSAGE);
                 }
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this,
+                        "Please enter valid numbers for prices and quantity.",
+                        "Invalid Input",
+                        JOptionPane.ERROR_MESSAGE);
             }
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Error loading item details: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -496,22 +465,15 @@ public class RecordsPanel extends JPanel {
                 JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            try {
-                if (controller.deleteInventoryItem(id)) {
-                    loadData();
-                    JOptionPane.showMessageDialog(this,
-                            "Item deleted successfully!",
-                            "Success",
-                            JOptionPane.INFORMATION_MESSAGE);
-                } else {
-                    JOptionPane.showMessageDialog(this,
-                            "Failed to delete item.",
-                            "Error",
-                            JOptionPane.ERROR_MESSAGE);
-                }
-            } catch (SQLException e) {
+            if (controller.deleteInventoryItem(id)) {
+                loadData();
                 JOptionPane.showMessageDialog(this,
-                        "Database error: " + e.getMessage(),
+                        "Item deleted successfully!",
+                        "Success",
+                        JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this,
+                        "Failed to delete item.",
                         "Error",
                         JOptionPane.ERROR_MESSAGE);
             }
@@ -528,53 +490,46 @@ public class RecordsPanel extends JPanel {
             return;
         }
 
-        try {
-            int id = itemIds.get(selectedRow);
-            Inventory item = controller.getInventoryItemById(id);
-            if (item == null || item.getRecipeInstructions() == null || item.getRecipeInstructions().trim().isEmpty()) {
-                JOptionPane.showMessageDialog(this,
-                        "No recipe available for this item.",
-                        "No Recipe",
-                        JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
-
-            // Create a custom dialog for recipe display
-            JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-                    "Recipe: " + item.getProductName(), true);
-            dialog.setLayout(new BorderLayout(10, 10));
-
-            // Create recipe text area
-            JTextArea recipeArea = new JTextArea(item.getRecipeInstructions());
-            recipeArea.setEditable(false);
-            recipeArea.setLineWrap(true);
-            recipeArea.setWrapStyleWord(true);
-            recipeArea.setMargin(new Insets(10, 10, 10, 10));
-            recipeArea.setBackground(new Color(252, 252, 252));
-            Font currentFont = recipeArea.getFont();
-            recipeArea.setFont(new Font(currentFont.getFontName(), Font.PLAIN, 14));
-
-            // Add components to dialog
-            JScrollPane scrollPane = new JScrollPane(recipeArea);
-            scrollPane.setPreferredSize(new Dimension(400, 300));
-            dialog.add(scrollPane, BorderLayout.CENTER);
-
-            // Add close button
-            JButton closeButton = new JButton("Close");
-            closeButton.addActionListener(e -> dialog.dispose());
-            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-            buttonPanel.add(closeButton);
-            dialog.add(buttonPanel, BorderLayout.SOUTH);
-
-            // Show dialog
-            dialog.pack();
-            dialog.setLocationRelativeTo(this);
-            dialog.setVisible(true);
-        } catch (SQLException e) {
+        int id = itemIds.get(selectedRow);
+        Inventory item = controller.getInventoryItemById(id);
+        if (item == null || item.getRecipeInstructions() == null || item.getRecipeInstructions().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this,
-                    "Error loading recipe: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
+                    "No recipe available for this item.",
+                    "No Recipe",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
         }
+
+        // Create a custom dialog for recipe display
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
+                "Recipe: " + item.getProductName(), true);
+        dialog.setLayout(new BorderLayout(10, 10));
+
+        // Create recipe text area
+        JTextArea recipeArea = new JTextArea(item.getRecipeInstructions());
+        recipeArea.setEditable(false);
+        recipeArea.setLineWrap(true);
+        recipeArea.setWrapStyleWord(true);
+        recipeArea.setMargin(new Insets(10, 10, 10, 10));
+        recipeArea.setBackground(new Color(252, 252, 252));
+        Font currentFont = recipeArea.getFont();
+        recipeArea.setFont(new Font(currentFont.getFontName(), Font.PLAIN, 14));
+
+        // Add components to dialog
+        JScrollPane scrollPane = new JScrollPane(recipeArea);
+        scrollPane.setPreferredSize(new Dimension(400, 300));
+        dialog.add(scrollPane, BorderLayout.CENTER);
+
+        // Add close button
+        JButton closeButton = new JButton("Close");
+        closeButton.addActionListener(e -> dialog.dispose());
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(closeButton);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
+
+        // Show dialog
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
     }
 } 

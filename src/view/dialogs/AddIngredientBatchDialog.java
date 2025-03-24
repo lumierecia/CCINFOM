@@ -34,7 +34,7 @@ public class AddIngredientBatchDialog extends JDialog {
 
     private void initComponents() {
         setLayout(new BorderLayout(10, 10));
-
+        
         // Create main panel with GridBagLayout
         JPanel mainPanel = new JPanel(new GridBagLayout());
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -47,7 +47,7 @@ public class AddIngredientBatchDialog extends JDialog {
         gbc.gridx = 0;
         gbc.gridy = 0;
         mainPanel.add(new JLabel("Ingredient:"), gbc);
-
+        
         gbc.gridx = 1;
         ingredientComboBox = new JComboBox<>();
         loadIngredients();
@@ -57,7 +57,7 @@ public class AddIngredientBatchDialog extends JDialog {
         gbc.gridx = 0;
         gbc.gridy = 1;
         mainPanel.add(new JLabel("Supplier:"), gbc);
-
+        
         gbc.gridx = 1;
         supplierComboBox = new JComboBox<>();
         loadSuppliers();
@@ -67,7 +67,7 @@ public class AddIngredientBatchDialog extends JDialog {
         gbc.gridx = 0;
         gbc.gridy = 2;
         mainPanel.add(new JLabel("Quantity:"), gbc);
-
+        
         gbc.gridx = 1;
         SpinnerNumberModel quantityModel = new SpinnerNumberModel(0.0, 0.0, 10000.0, 0.1);
         quantitySpinner = new JSpinner(quantityModel);
@@ -77,7 +77,7 @@ public class AddIngredientBatchDialog extends JDialog {
         gbc.gridx = 0;
         gbc.gridy = 3;
         mainPanel.add(new JLabel("Purchase Price:"), gbc);
-
+        
         gbc.gridx = 1;
         SpinnerNumberModel priceModel = new SpinnerNumberModel(0.0, 0.0, 10000.0, 0.1);
         priceSpinner = new JSpinner(priceModel);
@@ -87,7 +87,7 @@ public class AddIngredientBatchDialog extends JDialog {
         gbc.gridx = 0;
         gbc.gridy = 4;
         mainPanel.add(new JLabel("Purchase Date:"), gbc);
-
+        
         gbc.gridx = 1;
         Calendar calendar = Calendar.getInstance();
         Date initDate = calendar.getTime();
@@ -104,7 +104,7 @@ public class AddIngredientBatchDialog extends JDialog {
         gbc.gridx = 0;
         gbc.gridy = 5;
         mainPanel.add(new JLabel("Expiry Date:"), gbc);
-
+        
         gbc.gridx = 1;
         calendar = Calendar.getInstance();
         calendar.add(Calendar.MONTH, 1); // Default expiry date is one month from now
@@ -150,12 +150,12 @@ public class AddIngredientBatchDialog extends JDialog {
     private void loadIngredients() {
         ingredientMap = new HashMap<>();
         String query = "SELECT ingredient_id, name FROM Ingredients WHERE is_deleted = 0 ORDER BY name";
-
+        
         try {
             java.sql.Connection conn = controller.getConnection();
             java.sql.PreparedStatement stmt = conn.prepareStatement(query);
             java.sql.ResultSet rs = stmt.executeQuery();
-
+            
             while (rs.next()) {
                 String name = rs.getString("name");
                 int id = rs.getInt("ingredient_id");
@@ -165,21 +165,21 @@ public class AddIngredientBatchDialog extends JDialog {
         } catch (java.sql.SQLException e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this,
-                    "Failed to load ingredients: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
+                "Failed to load ingredients: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private void loadSuppliers() {
         supplierMap = new HashMap<>();
         String query = "SELECT supplier_id, name FROM Suppliers WHERE is_deleted = 0 ORDER BY name";
-
+        
         try {
             java.sql.Connection conn = controller.getConnection();
             java.sql.PreparedStatement stmt = conn.prepareStatement(query);
             java.sql.ResultSet rs = stmt.executeQuery();
-
+            
             while (rs.next()) {
                 String name = rs.getString("name");
                 int id = rs.getInt("supplier_id");
@@ -189,44 +189,44 @@ public class AddIngredientBatchDialog extends JDialog {
         } catch (java.sql.SQLException e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this,
-                    "Failed to load suppliers: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
+                "Failed to load suppliers: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private boolean validateInput() {
         if (ingredientComboBox.getSelectedItem() == null) {
             JOptionPane.showMessageDialog(this,
-                    "Please select an ingredient.",
-                    "Validation Error",
-                    JOptionPane.ERROR_MESSAGE);
+                "Please select an ingredient.",
+                "Validation Error",
+                JOptionPane.ERROR_MESSAGE);
             return false;
         }
 
         if (supplierComboBox.getSelectedItem() == null) {
             JOptionPane.showMessageDialog(this,
-                    "Please select a supplier.",
-                    "Validation Error",
-                    JOptionPane.ERROR_MESSAGE);
+                "Please select a supplier.",
+                "Validation Error",
+                JOptionPane.ERROR_MESSAGE);
             return false;
         }
 
         double quantity = (Double) quantitySpinner.getValue();
         if (quantity <= 0) {
             JOptionPane.showMessageDialog(this,
-                    "Quantity must be greater than 0.",
-                    "Validation Error",
-                    JOptionPane.ERROR_MESSAGE);
+                "Quantity must be greater than 0.",
+                "Validation Error",
+                JOptionPane.ERROR_MESSAGE);
             return false;
         }
 
         double price = (Double) priceSpinner.getValue();
         if (price <= 0) {
             JOptionPane.showMessageDialog(this,
-                    "Purchase price must be greater than 0.",
-                    "Validation Error",
-                    JOptionPane.ERROR_MESSAGE);
+                "Purchase price must be greater than 0.",
+                "Validation Error",
+                JOptionPane.ERROR_MESSAGE);
             return false;
         }
 
@@ -235,9 +235,9 @@ public class AddIngredientBatchDialog extends JDialog {
 
         if (expiryDate.before(purchaseDate)) {
             JOptionPane.showMessageDialog(this,
-                    "Expiry date cannot be before purchase date.",
-                    "Validation Error",
-                    JOptionPane.ERROR_MESSAGE);
+                "Expiry date cannot be before purchase date.",
+                "Validation Error",
+                JOptionPane.ERROR_MESSAGE);
             return false;
         }
 
@@ -247,80 +247,20 @@ public class AddIngredientBatchDialog extends JDialog {
     public IngredientBatch getBatch() {
         if (!confirmed) return null;
 
-        // Get selected items
+        IngredientBatch batch = new IngredientBatch();
         String selectedIngredient = (String) ingredientComboBox.getSelectedItem();
         String selectedSupplier = (String) supplierComboBox.getSelectedItem();
-
-        // Validate selections
-        if (selectedIngredient == null || selectedSupplier == null) {
-            JOptionPane.showMessageDialog(this,
-                    "Please select both an ingredient and a supplier.",
-                    "Validation Error",
-                    JOptionPane.ERROR_MESSAGE);
-            return null;
-        }
-
-        // Get the IDs from the maps
-        int ingredientId = ingredientMap.get(selectedIngredient);
-        int supplierId = supplierMap.get(selectedSupplier);
-
-        // Get the ingredient to get its unit ID
-        Ingredient ingredient = controller.getIngredientById(ingredientId);
-        if (ingredient == null) {
-            JOptionPane.showMessageDialog(this,
-                    "Failed to get ingredient details.",
-                    "Error",
-                    JOptionPane.ERROR_MESSAGE);
-            return null;
-        }
-
-        // Get values from spinners
-        double quantity = (Double) quantitySpinner.getValue();
-        double purchasePrice = (Double) priceSpinner.getValue();
-        Date purchaseDate = (Date) purchaseDateSpinner.getValue();
-        Date expiryDate = (Date) expiryDateSpinner.getValue();
-
-        // Validate values
-        if (quantity <= 0) {
-            JOptionPane.showMessageDialog(this,
-                    "Quantity must be greater than 0.",
-                    "Validation Error",
-                    JOptionPane.ERROR_MESSAGE);
-            return null;
-        }
-
-        if (purchasePrice <= 0) {
-            JOptionPane.showMessageDialog(this,
-                    "Purchase price must be greater than 0.",
-                    "Validation Error",
-                    JOptionPane.ERROR_MESSAGE);
-            return null;
-        }
-
-        if (expiryDate.before(purchaseDate)) {
-            JOptionPane.showMessageDialog(this,
-                    "Expiry date cannot be before purchase date.",
-                    "Validation Error",
-                    JOptionPane.ERROR_MESSAGE);
-            return null;
-        }
-
-        // Create new batch with required parameters
-        IngredientBatch batch = new IngredientBatch(
-                0, // batchId will be set by database
-                ingredientId,
-                ingredient.getUnitId(), // Get unit ID from the ingredient
-                quantity,
-                quantity, // remaining quantity starts equal to quantity
-                purchaseDate,
-                expiryDate,
-                purchasePrice,
-                supplierId
-        );
-
-        // Set the ingredient name for display purposes
+        
+        batch.setIngredientId(ingredientMap.get(selectedIngredient));
         batch.setIngredientName(selectedIngredient);
-        batch.setUnitName(ingredient.getUnitName());
+        batch.setSupplierId(supplierMap.get(selectedSupplier));
+        batch.setSupplierName(selectedSupplier);
+        batch.setQuantity((Double) quantitySpinner.getValue());
+        batch.setRemainingQuantity((Double) quantitySpinner.getValue());
+        batch.setPurchasePrice((Double) priceSpinner.getValue());
+        batch.setPurchaseDate((Date) purchaseDateSpinner.getValue());
+        batch.setExpiryDate((Date) expiryDateSpinner.getValue());
+        batch.setStatus("ACTIVE");
 
         return batch;
     }

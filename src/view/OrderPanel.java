@@ -2,12 +2,10 @@ package view;
 
 import controller.RestaurantController;
 import model.*;
-import util.StyledComponents;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.*;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,19 +36,10 @@ public class OrderPanel extends JPanel {
         // Setup category selection
         JPanel categoryPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         categoryPanel.add(new JLabel("Category:"));
-        try {
-            categoryCombo = new JComboBox<>(controller.getAllCategories().toArray(new String[0]));
-            categoryCombo.setToolTipText("<html>Select a food category to filter available items</html>");
-            categoryCombo.addActionListener(e -> updateProductCombo());
-            categoryPanel.add(categoryCombo);
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Error loading categories: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
-            categoryCombo = new JComboBox<>(new String[0]); // Empty combo box as fallback
-            categoryPanel.add(categoryCombo);
-        }
+        categoryCombo = new JComboBox<>(controller.getAllCategories().toArray(new String[0]));
+        categoryCombo.setToolTipText("<html>Select a food category to filter available items</html>");
+        categoryCombo.addActionListener(e -> updateProductCombo());
+        categoryPanel.add(categoryCombo);
 
         // Add help button for category selection
         JButton categoryHelpBtn = createHelpButton("""
@@ -95,19 +84,19 @@ public class OrderPanel extends JPanel {
         quantityPanel.add(quantityHelpBtn);
 
         // Create action buttons with consistent styling
-        JButton addButton = StyledComponents.createStyledButton("Add to Order", new Color(40, 167, 69));
+        JButton addButton = createStyledButton("Add to Order", new Color(40, 167, 69));
         addButton.addActionListener(e -> addItemToOrder());
 
-        JButton removeButton = StyledComponents.createStyledButton("Remove Item", new Color(220, 53, 69));
+        JButton removeButton = createStyledButton("Remove Item", new Color(220, 53, 69));
         removeButton.addActionListener(e -> removeSelectedItem());
 
-        JButton clearButton = StyledComponents.createStyledButton("Clear All", new Color(255, 193, 7));
+        JButton clearButton = createStyledButton("Clear All", new Color(255, 193, 7));
         clearButton.addActionListener(e -> clearOrder());
 
-        JButton placeOrderButton = StyledComponents.createStyledButton("Place Order", new Color(70, 130, 180));
+        JButton placeOrderButton = createStyledButton("Place Order", new Color(70, 130, 180));
         placeOrderButton.addActionListener(e -> placeOrder());
 
-        JButton helpButton = StyledComponents.createStyledButton("Help", new Color(108, 117, 125));
+        JButton helpButton = createStyledButton("Help", new Color(108, 117, 125));
         helpButton.addActionListener(e -> showHelp());
 
         // Add buttons to panel
@@ -128,8 +117,8 @@ public class OrderPanel extends JPanel {
 
         // Setup order items table with tooltip
         String[] columns = {
-                "Product Name", "Category", "Quantity",
-                "Unit Price", "Total"
+            "Product Name", "Category", "Quantity", 
+            "Unit Price", "Total"
         };
         itemsModel = new DefaultTableModel(columns, 0) {
             @Override
@@ -141,7 +130,7 @@ public class OrderPanel extends JPanel {
         orderItemsTable.setToolTipText("<html>List of items in your current order</html>");
         orderItemsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         orderItemsTable.getTableHeader().setReorderingAllowed(false);
-
+        
         // Set column widths
         orderItemsTable.getColumnModel().getColumn(0).setPreferredWidth(200); // Product Name
         orderItemsTable.getColumnModel().getColumn(1).setPreferredWidth(100); // Category
@@ -168,7 +157,7 @@ public class OrderPanel extends JPanel {
         totalPanel.add(totalLabel);
 
         bottomPanel.add(totalPanel, BorderLayout.CENTER);
-
+        
         // Add all panels to main panel
         add(topPanel, BorderLayout.NORTH);
         add(centerPanel, BorderLayout.CENTER);
@@ -179,18 +168,11 @@ public class OrderPanel extends JPanel {
         String category = (String) categoryCombo.getSelectedItem();
         productCombo.removeAllItems();
         if (category != null) {
-            try {
-                List<Dish> dishes = controller.getDishesByCategory(category);
-                for (Dish dish : dishes) {
-                    if (dish.isAvailable()) {
-                        productCombo.addItem(dish);
-                    }
+            List<Dish> dishes = controller.getDishesByCategory(category);
+            for (Dish dish : dishes) {
+                if (dish.isAvailable()) {
+                    productCombo.addItem(dish);
                 }
-            } catch (SQLException e) {
-                JOptionPane.showMessageDialog(this,
-                        "Error loading dishes: " + e.getMessage(),
-                        "Database Error",
-                        JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -199,9 +181,9 @@ public class OrderPanel extends JPanel {
         Dish selectedDish = (Dish) productCombo.getSelectedItem();
         if (selectedDish == null) {
             JOptionPane.showMessageDialog(this,
-                    "Please select a dish to add to the order.",
-                    "No Dish Selected",
-                    JOptionPane.WARNING_MESSAGE);
+                "Please select a dish to add to the order.",
+                "No Dish Selected",
+                JOptionPane.WARNING_MESSAGE);
             return;
         }
 
@@ -220,7 +202,7 @@ public class OrderPanel extends JPanel {
                 itemsModel.setValueAt(currentQty + quantity, i, 2);
                 double subtotal = (currentQty + quantity) * selectedDish.getSellingPrice();
                 itemsModel.setValueAt(String.format("$%.2f", subtotal), i, 4);
-
+                
                 // Update the OrderItem in our list
                 for (OrderItem item : orderItems) {
                     if (item.getDishId() == selectedDish.getDishId()) {
@@ -228,7 +210,7 @@ public class OrderPanel extends JPanel {
                         break;
                     }
                 }
-
+                
                 updateTotal();
                 return;
             }
@@ -237,22 +219,20 @@ public class OrderPanel extends JPanel {
         // Add new item to the table
         double subtotal = quantity * selectedDish.getSellingPrice();
         Object[] row = {
-                selectedDish.getName(),
-                selectedDish.getCategoryName(),
-                quantity,
-                String.format("$%.2f", selectedDish.getSellingPrice()),
-                String.format("$%.2f", subtotal)
+            selectedDish.getName(),
+            selectedDish.getCategoryName(),
+            quantity,
+            String.format("$%.2f", selectedDish.getSellingPrice()),
+            String.format("$%.2f", subtotal)
         };
         itemsModel.addRow(row);
 
         // Add to order items list
-        OrderItem newItem = new OrderItem(
-                0, // Temporary orderId, will be set when order is saved <------
-                selectedDish.getDishId(),
-                quantity,
-                selectedDish.getSellingPrice(),
-                selectedDish.getName()
-        );
+        OrderItem newItem = new OrderItem();
+        newItem.setDishId(selectedDish.getDishId());
+        newItem.setDishName(selectedDish.getName());
+        newItem.setQuantity(quantity);
+        newItem.setPriceAtTime(selectedDish.getSellingPrice());
         orderItems.add(newItem);
 
         updateTotal();
@@ -260,20 +240,20 @@ public class OrderPanel extends JPanel {
 
     private boolean showIngredientDetailsDialog(Dish dish) {
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-                "Dish Ingredients", true);
+            "Dish Ingredients", true);
         dialog.setLayout(new BorderLayout(10, 10));
 
         // Create info panel
         JPanel infoPanel = new JPanel(new GridLayout(3, 1, 5, 5));
         infoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
+        
         JLabel nameLabel = new JLabel("Dish: " + dish.getName());
         nameLabel.setFont(nameLabel.getFont().deriveFont(Font.BOLD));
         infoPanel.add(nameLabel);
-
+        
         JLabel priceLabel = new JLabel(String.format("Price: $%.2f", dish.getSellingPrice()));
         infoPanel.add(priceLabel);
-
+        
         JLabel categoryLabel = new JLabel("Category: " + dish.getCategoryName());
         infoPanel.add(categoryLabel);
 
@@ -288,33 +268,25 @@ public class OrderPanel extends JPanel {
         JTable ingredientTable = new JTable(ingredientModel);
 
         // Get ingredients for this dish
+        Map<Integer, Double> requiredIngredients = controller.getDishIngredients(dish.getDishId());
         boolean hasEnoughIngredients = true;
-        try {
-            List<DishIngredient> dishIngredients = controller.getDishIngredients(dish.getDishId());
-            for (DishIngredient dishIngredient : dishIngredients) {
-                Ingredient ingredient = controller.getIngredientById(dishIngredient.getIngredientId());
-                if (ingredient != null) {
-                    double requiredAmount = dishIngredient.getQuantityNeeded();
-                    String status = ingredient.getQuantityInStock() >= requiredAmount ?
-                            "Available" : "Insufficient Stock";
-                    if (status.equals("Insufficient Stock")) {
-                        hasEnoughIngredients = false;
-                    }
-                    Object[] row = {
-                            ingredient.getName(),
-                            String.format("%.2f %s", requiredAmount, ingredient.getUnitName()),
-                            String.format("%.2f %s", ingredient.getQuantityInStock(), ingredient.getUnitName()),
-                            status
-                    };
-                    ingredientModel.addRow(row);
+
+        for (Map.Entry<Integer, Double> entry : requiredIngredients.entrySet()) {
+            Ingredient ingredient = controller.getIngredientById(entry.getKey());
+            if (ingredient != null) {
+                String status = ingredient.getQuantityInStock() >= entry.getValue() ? 
+                    "Available" : "Insufficient Stock";
+                if (status.equals("Insufficient Stock")) {
+                    hasEnoughIngredients = false;
                 }
+                Object[] row = {
+                    ingredient.getName(),
+                    String.format("%.2f %s", entry.getValue(), ingredient.getUnitName()),
+                    String.format("%.2f %s", ingredient.getQuantityInStock(), ingredient.getUnitName()),
+                    status
+                };
+                ingredientModel.addRow(row);
             }
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Error loading ingredients: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
-            return false;
         }
 
         // Add recipe instructions if available
@@ -325,7 +297,7 @@ public class OrderPanel extends JPanel {
             recipeArea.setWrapStyleWord(true);
             recipeArea.setBackground(new Color(250, 250, 250));
             recipeArea.setBorder(BorderFactory.createTitledBorder("Recipe Instructions"));
-
+            
             JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
             contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
             contentPanel.add(infoPanel, BorderLayout.NORTH);
@@ -347,7 +319,7 @@ public class OrderPanel extends JPanel {
         JButton cancelButton = new JButton("Cancel");
 
         final boolean[] confirmed = {false};
-
+        
         addButton.addActionListener(e -> {
             confirmed[0] = true;
             dialog.dispose();
@@ -361,8 +333,8 @@ public class OrderPanel extends JPanel {
         // Show dialog
         dialog.pack();
         dialog.setSize(new Dimension(
-                Math.max(dialog.getWidth(), 600),
-                Math.max(dialog.getHeight(), 400)
+            Math.max(dialog.getWidth(), 600),
+            Math.max(dialog.getHeight(), 400)
         ));
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
@@ -396,94 +368,94 @@ public class OrderPanel extends JPanel {
     private void placeOrder() {
         if (orderItems.isEmpty()) {
             JOptionPane.showMessageDialog(this,
-                    "Please add items to the order before placing it.",
-                    "Empty Order",
-                    JOptionPane.WARNING_MESSAGE);
+                "Please add items to the order before placing it.",
+                "Empty Order",
+                JOptionPane.WARNING_MESSAGE);
             return;
         }
 
         // Create customer selection dialog
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Select Customer", true);
         dialog.setLayout(new BorderLayout());
-
+        
         // Create customer selection panel
         JPanel customerPanel = new JPanel(new BorderLayout());
         List<Customer> customers = controller.getAllCustomers();
         JComboBox<Customer> customerCombo = new JComboBox<>(customers.toArray(new Customer[0]));
         customerPanel.add(new JLabel("Select Customer:"), BorderLayout.WEST);
         customerPanel.add(customerCombo, BorderLayout.CENTER);
-
+        
         // Create employee selection panel
         JPanel employeePanel = new JPanel(new BorderLayout());
         List<Employee> employees = controller.getAllEmployees();
         JComboBox<Employee> employeeCombo = new JComboBox<>(employees.toArray(new Employee[0]));
         employeePanel.add(new JLabel("Assign Employee:"), BorderLayout.WEST);
         employeePanel.add(employeeCombo, BorderLayout.CENTER);
-
+        
         // Create order type panel
         JPanel typePanel = new JPanel(new BorderLayout());
         String[] orderTypes = {"Dine In", "Take Out", "Delivery"};
         JComboBox<String> typeCombo = new JComboBox<>(orderTypes);
         typePanel.add(new JLabel("Order Type:"), BorderLayout.WEST);
         typePanel.add(typeCombo, BorderLayout.CENTER);
-
+        
         // Combine panels
         JPanel selectionPanel = new JPanel(new GridLayout(3, 1, 5, 5));
         selectionPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         selectionPanel.add(customerPanel);
         selectionPanel.add(employeePanel);
         selectionPanel.add(typePanel);
-
+        
         // Add buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton confirmButton = new JButton("Place Order");
         JButton cancelButton = new JButton("Cancel");
-
+        
         confirmButton.addActionListener(e -> {
             Customer selectedCustomer = (Customer) customerCombo.getSelectedItem();
             Employee selectedEmployee = (Employee) employeeCombo.getSelectedItem();
             String orderType = (String) typeCombo.getSelectedItem();
-
+            
             if (selectedCustomer == null || selectedEmployee == null) {
                 JOptionPane.showMessageDialog(dialog,
-                        "Please select both a customer and an employee.",
-                        "Missing Information",
-                        JOptionPane.WARNING_MESSAGE);
+                    "Please select both a customer and an employee.",
+                    "Missing Information",
+                    JOptionPane.WARNING_MESSAGE);
                 return;
             }
-
+            
             // Create the order
             Order order = new Order();
             order.setCustomerId(selectedCustomer.getCustomerId());
             order.setOrderType(orderType);
             order.setOrderStatus("Pending");
             order.setPaymentStatus("Pending");
-
+            
             // Create list of employee IDs
             List<Integer> employeeIds = new ArrayList<>();
             employeeIds.add(selectedEmployee.getEmployeeId());
-
+            
             // Try to create the order
             if (controller.createOrder(order, orderItems, employeeIds)) {
                 JOptionPane.showMessageDialog(this,
-                        "Order placed successfully!",
-                        "Success",
-                        JOptionPane.INFORMATION_MESSAGE);
+                    "Order placed successfully!",
+                    "Success",
+                    JOptionPane.INFORMATION_MESSAGE);
                 clearOrder();
                 dialog.dispose();
             } else {
                 JOptionPane.showMessageDialog(this,
-                        "Failed to place order. Please check ingredient availability.",
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE);
+                    "Failed to place order. Please check ingredient availability.",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
             }
         });
-
+        
         cancelButton.addActionListener(e -> dialog.dispose());
-
+        
         buttonPanel.add(confirmButton);
         buttonPanel.add(cancelButton);
-
+        
         dialog.add(selectionPanel, BorderLayout.CENTER);
         dialog.add(buttonPanel, BorderLayout.SOUTH);
         dialog.pack();
@@ -492,40 +464,58 @@ public class OrderPanel extends JPanel {
     }
 
     private JButton createHelpButton(String helpText) {
-        JButton helpButton = StyledComponents.createStyledButton("?", new Color(108, 117, 125));
-        helpButton.setToolTipText(helpText);
-        return helpButton;
+        JButton helpBtn = new JButton("?");
+        helpBtn.setFont(new Font(helpBtn.getFont().getName(), Font.BOLD, 10));
+        helpBtn.setMargin(new Insets(1, 4, 1, 4));
+        helpBtn.setToolTipText("Click for help");
+        helpBtn.addActionListener(e -> {
+            JTextArea textArea = new JTextArea(helpText);
+            textArea.setEditable(false);
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
+            textArea.setMargin(new Insets(10, 10, 10, 10));
+            textArea.setBackground(new Color(252, 252, 252));
+            
+            JScrollPane scrollPane = new JScrollPane(textArea);
+            scrollPane.setPreferredSize(new Dimension(300, 200));
+            
+            JOptionPane.showMessageDialog(this,
+                scrollPane,
+                "Help",
+                JOptionPane.INFORMATION_MESSAGE);
+        });
+        return helpBtn;
+    }
+
+    private JButton createStyledButton(String text, Color backgroundColor) {
+        JButton button = new JButton(text);
+        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
+        button.setBackground(backgroundColor);
+        button.setForeground(Color.BLACK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+
+        // Add hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(backgroundColor.brighter());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(backgroundColor);
+            }
+        });
+
+        return button;
     }
 
     private void showHelp() {
-        String helpText = """
-            Order Management Help:
-            
-            1. Adding Items:
-               • Select a category to filter menu items
-               • Choose a product from the list
-               • Set the quantity
-               • Click "Add to Order"
-            
-            2. Managing Order:
-               • View items in the table below
-               • Select an item and click "Remove Item" to delete
-               • Click "Clear All" to start over
-            
-            3. Placing Order:
-               • Review your order in the table
-               • Check the total amount
-               • Click "Place Order" when ready
-            
-            4. Additional Features:
-               • Hover over buttons for tooltips
-               • Click the "?" buttons for specific help
-               • Ingredient details are shown before adding items
-            """;
-
-        JOptionPane.showMessageDialog(this,
-                helpText,
-                "Order Management Help",
-                JOptionPane.INFORMATION_MESSAGE);
+        HelpDialog helpDialog = new HelpDialog(SwingUtilities.getWindowAncestor(this), "Orders");
+        helpDialog.setVisible(true);
     }
 } 

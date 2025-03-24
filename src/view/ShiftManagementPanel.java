@@ -2,7 +2,6 @@ package view;
 
 import controller.RestaurantController;
 import model.Employee;
-import util.StyledComponents;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -47,27 +46,27 @@ public class ShiftManagementPanel extends JPanel {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         
         // Assign Shift button
-        assignButton = StyledComponents.createStyledButton("Assign Shift", new Color(70, 130, 180));
+        assignButton = createStyledButton("Assign Shift", new Color(70, 130, 180));
         assignButton.addActionListener(e -> showAssignDialog());
         
         // Remove Shift button
-        removeButton = StyledComponents.createStyledButton("Remove Shift", new Color(220, 53, 69));
+        removeButton = createStyledButton("Remove Shift", new Color(220, 53, 69));
         removeButton.addActionListener(e -> removeSelectedShift());
         
         // View Schedule button
-        viewScheduleButton = StyledComponents.createStyledButton("View Schedule", new Color(40, 167, 69));
+        viewScheduleButton = createStyledButton("View Schedule", new Color(40, 167, 69));
         viewScheduleButton.addActionListener(e -> showScheduleDialog());
 
         // Swap Shift button
-        swapShiftButton = StyledComponents.createStyledButton("Swap Shifts", new Color(255, 193, 7));
+        swapShiftButton = createStyledButton("Swap Shifts", new Color(255, 193, 7));
         swapShiftButton.addActionListener(e -> showSwapShiftDialog());
 
         // Break Schedule button
-        breakScheduleButton = StyledComponents.createStyledButton("Break Schedule", new Color(108, 117, 125));
+        breakScheduleButton = createStyledButton("Break Schedule", new Color(108, 117, 125));
         breakScheduleButton.addActionListener(e -> showBreakScheduleDialog());
 
         // Help button
-        JButton helpButton = StyledComponents.createStyledButton("Help", new Color(23, 162, 184));
+        JButton helpButton = createStyledButton("Help", new Color(23, 162, 184));
         helpButton.addActionListener(e -> showHelp());
         
         buttonPanel.add(assignButton);
@@ -109,6 +108,33 @@ public class ShiftManagementPanel extends JPanel {
         // Add components
         add(topPanel, BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);
+    }
+
+    private JButton createStyledButton(String text, Color backgroundColor) {
+        JButton button = new JButton(text);
+        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
+        button.setBackground(backgroundColor);
+        button.setForeground(Color.BLACK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+
+        // Add hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(backgroundColor.brighter());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(backgroundColor);
+            }
+        });
+
+        return button;
     }
 
     private void loadShifts() {
@@ -385,8 +411,8 @@ public class ShiftManagementPanel extends JPanel {
 
         // Create buttons panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton swapButton = StyledComponents.createStyledButton("Swap", new Color(255, 193, 7));
-        JButton cancelButton = StyledComponents.createStyledButton("Cancel", new Color(108, 117, 125));
+        JButton swapButton = createStyledButton("Swap", new Color(255, 193, 7));
+        JButton cancelButton = createStyledButton("Cancel", new Color(108, 117, 125));
 
         swapButton.addActionListener(e -> {
             Employee emp1 = (Employee) employee1Combo.getSelectedItem();
@@ -478,8 +504,8 @@ public class ShiftManagementPanel extends JPanel {
 
         // Create buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton scheduleButton = StyledComponents.createStyledButton("Schedule", new Color(40, 167, 69));
-        JButton cancelButton = StyledComponents.createStyledButton("Cancel", new Color(108, 117, 125));
+        JButton scheduleButton = createStyledButton("Schedule", new Color(40, 167, 69));
+        JButton cancelButton = createStyledButton("Cancel", new Color(108, 117, 125));
 
         scheduleButton.addActionListener(e -> {
             // Implement break scheduling logic here

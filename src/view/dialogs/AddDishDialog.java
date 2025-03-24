@@ -2,248 +2,131 @@ package view.dialogs;
 
 import controller.RestaurantController;
 import model.Dish;
-import model.DishIngredient;
-import model.Ingredient;
-import view.components.BaseDialog;
-import view.components.BaseFormDialog;
 
 import javax.swing.*;
 import java.awt.*;
-import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 
-public class AddDishDialog extends BaseFormDialog {
+public class AddDishDialog extends JDialog {
     private final RestaurantController controller;
+    private boolean dishAdded = false;
     private final JTextField nameField;
     private final JComboBox<String> categoryComboBox;
     private final JSpinner priceSpinner;
     private final JTextArea recipeArea;
     private final JCheckBox availableCheckBox;
-    private final JPanel ingredientsPanel;
-    private final List<IngredientRow> ingredientRows;
-    private final JButton addIngredientButton;
-    private boolean dishAdded = false;
 
-    public AddDishDialog(Frame owner, RestaurantController controller) {
-        super(owner, "Add New Dish");
+    public AddDishDialog(Window owner, RestaurantController controller) {
+        super(owner, "Add New Dish", ModalityType.APPLICATION_MODAL);
         this.controller = controller;
-        this.ingredientRows = new ArrayList<>();
 
-        // Create form fields
-        nameField = createTextField();
-        categoryComboBox = createComboBox(getCategories());
-        priceSpinner = createSpinner(new SpinnerNumberModel(0.0, 0.0, 10000.0, 0.01));
-        recipeArea = createTextArea();
-        availableCheckBox = createCheckBox();
-        ingredientsPanel = new JPanel();
-        ingredientsPanel.setLayout(new BoxLayout(ingredientsPanel, BoxLayout.Y_AXIS));
-        addIngredientButton = new JButton("Add Ingredient");
+        setLayout(new BorderLayout());
+        JPanel mainPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Add form fields
-        addFormField("Name:", nameField);
-        addFormField("Category:", categoryComboBox);
-        addFormField("Price:", priceSpinner);
-        addFormField("Recipe:", recipeArea);
-        addFormField("Available:", availableCheckBox);
-        addFormField("Ingredients:", ingredientsPanel);
+        // Name field
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        mainPanel.add(new JLabel("Name:"), gbc);
 
-        // Add ingredient button
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        buttonPanel.add(addIngredientButton);
-        ingredientsPanel.add(buttonPanel);
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        nameField = new JTextField(20);
+        mainPanel.add(nameField, gbc);
 
-        // Set up ingredient button listener
-        addIngredientButton.addActionListener(e -> addIngredientRow());
+        // Category combo box
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.weightx = 0.0;
+        mainPanel.add(new JLabel("Category:"), gbc);
 
-        // Set default values
-        availableCheckBox.setSelected(true);
-    }
-
-    private void addIngredientRow() {
-        IngredientRow row = new IngredientRow();
-        ingredientRows.add(row);
-        ingredientsPanel.add(row.panel);
-        ingredientsPanel.revalidate();
-        ingredientsPanel.repaint();
-    }
-
-    private String[] getCategories() {
-        try {
-            List<String> categories = controller.getAllCategories();
-            return categories.toArray(new String[0]);
-        } catch (SQLException e) {
-            BaseDialog.showError(this, "Error loading categories: " + e.getMessage(), "Database Error");
-            return new String[0];
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        categoryComboBox = new JComboBox<>();
+        List<String> categories = controller.getAllCategories();
+        for (String category : categories) {
+            categoryComboBox.addItem(category);
         }
+        mainPanel.add(categoryComboBox, gbc);
+
+        // Price spinner
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.weightx = 0.0;
+        mainPanel.add(new JLabel("Price:"), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        SpinnerNumberModel priceModel = new SpinnerNumberModel(0.0, 0.0, 10000.0, 0.1);
+        priceSpinner = new JSpinner(priceModel);
+        mainPanel.add(priceSpinner, gbc);
+
+        // Recipe instructions
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.weightx = 0.0;
+        mainPanel.add(new JLabel("Recipe:"), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.weighty = 1.0;
+        recipeArea = new JTextArea(5, 20);
+        recipeArea.setLineWrap(true);
+        recipeArea.setWrapStyleWord(true);
+        JScrollPane recipeScroll = new JScrollPane(recipeArea);
+        mainPanel.add(recipeScroll, gbc);
+
+        // Available checkbox
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        gbc.gridwidth = 2;
+        gbc.weighty = 0.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        availableCheckBox = new JCheckBox("Available", true);
+        mainPanel.add(availableCheckBox, gbc);
+
+        // Buttons panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton saveButton = new JButton("Save");
+        saveButton.addActionListener(e -> saveDish());
+        JButton cancelButton = new JButton("Cancel");
+        cancelButton.addActionListener(e -> dispose());
+        buttonPanel.add(saveButton);
+        buttonPanel.add(cancelButton);
+
+        add(mainPanel, BorderLayout.CENTER);
+        add(buttonPanel, BorderLayout.SOUTH);
+
+        pack();
+        setLocationRelativeTo(owner);
     }
 
-    private String[] getIngredients() {
-        try {
-            List<Ingredient> ingredients = controller.getAllIngredients();
-            return ingredients.stream()
-                    .map(i -> i.getIngredientId() + " - " + i.getName())
-                    .toArray(String[]::new);
-        } catch (Exception e) {
-            BaseDialog.showError(this, "Error loading ingredients: " + e.getMessage(), "Database Error");
-            return new String[0];
-        }
-    }
-
-    private String[] getUnits() {
-        try {
-            List<String> units = controller.getAllUnits();
-            return units.toArray(new String[0]);
-        } catch (SQLException e) {
-            BaseDialog.showError(this, "Error loading units: " + e.getMessage(), "Database Error");
-            return new String[0];
-        }
-    }
-
-    @Override
-    protected boolean validateForm() {
-        String name = getTextFieldValue(nameField);
+    private void saveDish() {
+        String name = nameField.getText().trim();
         if (name.isEmpty()) {
-            BaseDialog.showError(this, "Please enter a dish name.", "Validation Error");
-            return false;
+            JOptionPane.showMessageDialog(this,
+                "Please enter a dish name.",
+                "Validation Error",
+                JOptionPane.ERROR_MESSAGE);
+            return;
         }
 
-        try {
-            double price = getSpinnerValue(priceSpinner);
-            if (price <= 0) {
-                BaseDialog.showError(this, "Price must be greater than 0.", "Validation Error");
-                return false;
-            }
-        } catch (NumberFormatException e) {
-            BaseDialog.showError(this, "Please enter a valid price.", "Validation Error");
-            return false;
-        }
+        String category = (String) categoryComboBox.getSelectedItem();
+        double price = (Double) priceSpinner.getValue();
+        String recipe = recipeArea.getText().trim();
+        boolean available = availableCheckBox.isSelected();
 
-        // Validate ingredients
-        if (ingredientRows.isEmpty()) {
-            BaseDialog.showError(this, "Please add at least one ingredient.", "Validation Error");
-            return false;
-        }
-
-        for (IngredientRow row : ingredientRows) {
-            if (!row.validate()) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    @Override
-    protected void saveFormData() {
-        try {
-            String name = getTextFieldValue(nameField);
-            String category = getComboBoxValue(categoryComboBox);
-            double price = getSpinnerValue(priceSpinner);
-            String recipe = getTextAreaValue(recipeArea);
-            boolean available = getCheckBoxValue(availableCheckBox);
-
-            Dish dish = new Dish();
-            dish.setName(name);
-            dish.setCategoryId(controller.getCategoryId(category));
-            dish.setSellingPrice(price);
-            dish.setRecipeInstructions(recipe);
-            dish.setAvailable(available);
-
-            // Add ingredients
-            List<DishIngredient> ingredients = new ArrayList<>();
-            for (IngredientRow row : ingredientRows) {
-                DishIngredient ingredient = row.createIngredient();
-                if (ingredient != null) {
-                    ingredients.add(ingredient);
-                }
-            }
-            dish.setIngredients(ingredients);
-
-            if (controller.addDish(dish)) {
-                dishAdded = true;
-                BaseDialog.showInfo(this, "Dish added successfully!", "Success");
-            } else {
-                BaseDialog.showError(this, "Failed to add dish.", "Error");
-            }
-        } catch (SQLException e) {
-            BaseDialog.showError(this, "Database error: " + e.getMessage(), "Error");
+        Dish dish = new Dish(name, category, price, recipe, available);
+        if (controller.addDish(dish)) {
+            dishAdded = true;
+            dispose();
         }
     }
 
     public boolean isDishAdded() {
         return dishAdded;
-    }
-
-    private class IngredientRow {
-        private final JPanel panel;
-        private final JComboBox<String> ingredientCombo;
-        private final JSpinner quantitySpinner;
-        private final JComboBox<String> unitCombo;
-        private final JButton removeButton;
-
-        public IngredientRow() {
-            panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            
-            ingredientCombo = createComboBox(getIngredients());
-            quantitySpinner = createSpinner(new SpinnerNumberModel(0.0, 0.0, 1000.0, 0.1));
-            unitCombo = createComboBox(getUnits());
-            removeButton = new JButton("Remove");
-
-            panel.add(new JLabel("Ingredient:"));
-            panel.add(ingredientCombo);
-            panel.add(new JLabel("Quantity:"));
-            panel.add(quantitySpinner);
-            panel.add(new JLabel("Unit:"));
-            panel.add(unitCombo);
-            panel.add(removeButton);
-
-            removeButton.addActionListener(e -> {
-                ingredientRows.remove(this);
-                ingredientsPanel.remove(panel);
-                ingredientsPanel.revalidate();
-                ingredientsPanel.repaint();
-            });
-        }
-
-        public boolean validate() {
-            if (ingredientCombo.getSelectedItem() == null) {
-                BaseDialog.showError(AddDishDialog.this, "Please select an ingredient.", "Validation Error");
-                return false;
-            }
-
-            try {
-                double quantity = (Double) quantitySpinner.getValue();
-                if (quantity <= 0) {
-                    BaseDialog.showError(AddDishDialog.this, "Quantity must be greater than 0.", "Validation Error");
-                    return false;
-                }
-            } catch (NumberFormatException e) {
-                BaseDialog.showError(AddDishDialog.this, "Please enter a valid quantity.", "Validation Error");
-                return false;
-            }
-
-            if (unitCombo.getSelectedItem() == null) {
-                BaseDialog.showError(AddDishDialog.this, "Please select a unit.", "Validation Error");
-                return false;
-            }
-
-            return true;
-        }
-
-        public DishIngredient createIngredient() {
-            try {
-                String ingredientStr = (String) ingredientCombo.getSelectedItem();
-                int ingredientId = Integer.parseInt(ingredientStr.split(" - ")[0]);
-                double quantity = (Double) quantitySpinner.getValue();
-                String unitStr = (String) unitCombo.getSelectedItem();
-                int unitId = controller.getUnitId(unitStr);
-
-                return new DishIngredient(0, ingredientId, quantity, unitId);
-            } catch (SQLException e) {
-                BaseDialog.showError(AddDishDialog.this, "Error creating ingredient: " + e.getMessage(), "Error");
-                return null;
-            }
-        }
     }
 } 

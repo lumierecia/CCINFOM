@@ -26,15 +26,6 @@ CREATE TABLE IF NOT EXISTS `TimeShifts` (
     time_end TIME NOT NULL
 );
 
--- Add Tables table for table management
-CREATE TABLE IF NOT EXISTS `Tables` (
-    table_id INT AUTO_INCREMENT PRIMARY KEY,
-    table_number INT NOT NULL UNIQUE,
-    capacity INT NOT NULL,
-    status ENUM('Available', 'Occupied', 'Reserved') DEFAULT 'Available',
-    is_deleted BOOLEAN DEFAULT FALSE
-);
-
 -- Core tables for employee management
 CREATE TABLE IF NOT EXISTS `Employees` (
     employee_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -69,28 +60,8 @@ CREATE TABLE IF NOT EXISTS `Orders` (
     payment_method ENUM('Cash', 'Credit Card') NULL,
     payment_status ENUM('Pending', 'Paid') NOT NULL DEFAULT 'Pending',
     is_deleted BOOLEAN DEFAULT FALSE,
-    table_id INT NULL,
-    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
-    FOREIGN KEY (table_id) REFERENCES Tables(table_id)
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
 );
-
--- Create Payments table
-CREATE TABLE IF NOT EXISTS `Payments` (
-    payment_id INT PRIMARY KEY AUTO_INCREMENT,
-    order_id INT NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
-    payment_method ENUM('Cash', 'Credit Card') NOT NULL,
-    status ENUM('Pending', 'Completed', 'Failed', 'Refunded') NOT NULL DEFAULT 'Pending',
-    payment_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    transaction_id VARCHAR(100),
-    notes TEXT,
-    FOREIGN KEY (order_id) REFERENCES Orders(order_id)
-);
-
--- Add indexes for better performance
-CREATE INDEX idx_payment_date ON Payments(payment_date);
-CREATE INDEX idx_order_id ON Payments(order_id);
-CREATE INDEX idx_status ON Payments(status);
 
 -- Core tables for supplier management
 CREATE TABLE IF NOT EXISTS `Suppliers` (
@@ -200,75 +171,6 @@ CREATE TABLE IF NOT EXISTS `IngredientTransactions` (
     FOREIGN KEY (supplier_id) REFERENCES Suppliers(supplier_id),
     FOREIGN KEY (order_id) REFERENCES Orders(order_id),
     FOREIGN KEY (employee_id) REFERENCES Employees(employee_id)
-);
-
--- Add UserCredentials table for login system
-CREATE TABLE IF NOT EXISTS `UserCredentials` (
-    user_id INT AUTO_INCREMENT PRIMARY KEY,
-    employee_id INT NOT NULL,
-    username VARCHAR(50) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    last_login TIMESTAMP NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (employee_id) REFERENCES Employees(employee_id)
-);
-
--- Add EmployeeShifts table for detailed shift management
-CREATE TABLE IF NOT EXISTS `EmployeeShifts` (
-    shift_id INT AUTO_INCREMENT PRIMARY KEY,
-    employee_id INT NOT NULL,
-    time_shiftid INT NOT NULL,
-    shift_date DATE NOT NULL,
-    status ENUM('Scheduled', 'Present', 'Absent', 'Late') DEFAULT 'Scheduled',
-    check_in TIMESTAMP NULL,
-    check_out TIMESTAMP NULL,
-    FOREIGN KEY (employee_id) REFERENCES Employees(employee_id),
-    FOREIGN KEY (time_shiftid) REFERENCES TimeShifts(time_shiftid)
-);
-
--- Add Customer Loyalty Program tables
-CREATE TABLE IF NOT EXISTS `CustomerLoyalty` (
-    customer_id INT PRIMARY KEY,
-    points_balance INT DEFAULT 0,
-    tier ENUM('Bronze', 'Silver', 'Gold', 'Platinum') DEFAULT 'Bronze',
-    points_earned_lifetime INT DEFAULT 0,
-    points_redeemed_lifetime INT DEFAULT 0,
-    last_points_earned TIMESTAMP NULL,
-    last_points_redeemed TIMESTAMP NULL,
-    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
-);
-
-CREATE TABLE IF NOT EXISTS `LoyaltyTransactions` (
-    transaction_id INT AUTO_INCREMENT PRIMARY KEY,
-    customer_id INT NOT NULL,
-    transaction_type ENUM('Earn', 'Redeem', 'Expire', 'Adjust') NOT NULL,
-    points_amount INT NOT NULL,
-    transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    order_id INT,
-    notes TEXT,
-    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
-    FOREIGN KEY (order_id) REFERENCES Orders(order_id)
-);
-
-CREATE TABLE IF NOT EXISTS `LoyaltyRewards` (
-    reward_id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    points_cost INT NOT NULL,
-    tier_requirement ENUM('Bronze', 'Silver', 'Gold', 'Platinum'),
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS `CustomerRewards` (
-    customer_id INT NOT NULL,
-    reward_id INT NOT NULL,
-    redeemed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status ENUM('Available', 'Used', 'Expired') DEFAULT 'Available',
-    expiry_date DATE,
-    PRIMARY KEY (customer_id, reward_id),
-    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id),
-    FOREIGN KEY (reward_id) REFERENCES LoyaltyRewards(reward_id)
 );
 
 -- Insert reference data
@@ -462,105 +364,3 @@ INSERT INTO AssignedEmployeesToOrders (order_id, employee_id) VALUES
 (4, 5),  -- Jennie Kim (Chef) for order 4
 (5, 3),  -- Spongebob (Waiter) for order 5
 (5, 2);  -- Sabrina Carpenter (Chef) for order 5
-
--- Insert sample data for tables
-INSERT INTO Tables (table_number, capacity) VALUES
-(1, 4), (2, 4), (3, 6), (4, 6), (5, 8),
-(6, 4), (7, 4), (8, 6), (9, 6), (10, 8);
-
--- Insert sample user credentials (password: 'password123')
-INSERT INTO UserCredentials (employee_id, username, password_hash) VALUES
-(1, 'john.wick', 'password123'),
-(2, 'sabrina.carpenter', 'password123'),
-(3, 'spongebob.squarepants', 'password123'),
-(4, 'bruno.mars', 'password123'),
-(5, 'jennie.kim', 'password123'),
-(6, 'ariana.grande', 'password123'),
-(7, 'nicki.minaj', 'password123'),
-(8, 'peter.parker', 'password123'),
-(9, 'donald.trump', 'password123'),
-(10, 'patrick.star', 'password123');
-
--- Insert sample employee shifts
-INSERT INTO EmployeeShifts (employee_id, time_shiftid, shift_date) VALUES
-(1, 1, CURDATE()), (2, 1, CURDATE()), (3, 2, CURDATE()),
-(4, 1, CURDATE()), (5, 2, CURDATE()), (8, 3, CURDATE()),
-(9, 3, CURDATE());
-
--- Insert sample loyalty rewards
-INSERT INTO LoyaltyRewards (name, description, points_cost, tier_requirement) VALUES
-('Free Appetizer', 'Choose any appetizer from our menu', 500, 'Bronze'),
-('10% Off Next Order', 'Get 10% off your next order', 1000, 'Bronze'),
-('Free Dessert', 'Choose any dessert from our menu', 750, 'Silver'),
-('15% Off Next Order', 'Get 15% off your next order', 1500, 'Silver'),
-('Free Main Course', 'Choose any main course from our menu', 2000, 'Gold'),
-('20% Off Next Order', 'Get 20% off your next order', 2000, 'Gold'),
-('Free Meal for Two', 'Enjoy a free meal for two people', 3000, 'Platinum'),
-('25% Off Next Order', 'Get 25% off your next order', 2500, 'Platinum');
-
--- Initialize loyalty accounts for existing customers
-INSERT INTO CustomerLoyalty (customer_id, points_balance, tier, points_earned_lifetime)
-SELECT customer_id, 0, 'Bronze', 0 FROM Customers;
-
--- Add views for reporting
-CREATE OR REPLACE VIEW `SalesReport` AS
-SELECT 
-    DATE_FORMAT(o.order_datetime, '%Y-%m') as month,
-    COUNT(DISTINCT o.order_id) as total_orders,
-    SUM(o.total_amount) as total_sales,
-    AVG(o.total_amount) as average_sale,
-    COUNT(DISTINCT o.customer_id) as unique_customers
-FROM Orders o
-WHERE o.is_deleted = FALSE
-GROUP BY DATE_FORMAT(o.order_datetime, '%Y-%m');
-
-CREATE OR REPLACE VIEW `EmployeePerformanceReport` AS
-SELECT 
-    e.employee_id,
-    CONCAT(e.first_name, ' ', e.last_name) as employee_name,
-    COUNT(DISTINCT o.order_id) as orders_handled,
-    SUM(o.total_amount) as total_sales,
-    COUNT(DISTINCT es.shift_id) as shifts_worked,
-    COUNT(CASE WHEN es.status = 'Late' THEN 1 END) as late_shifts
-FROM Employees e
-LEFT JOIN AssignedEmployeesToOrders aeto ON e.employee_id = aeto.employee_id
-LEFT JOIN Orders o ON aeto.order_id = o.order_id
-LEFT JOIN EmployeeShifts es ON e.employee_id = es.employee_id
-WHERE e.is_deleted = FALSE
-GROUP BY e.employee_id;
-
-CREATE OR REPLACE VIEW `CustomerInsightsReport` AS
-SELECT 
-    DATE_FORMAT(o.order_datetime, '%Y-%m') as month,
-    COUNT(DISTINCT CASE WHEN o.customer_id IN (
-        SELECT customer_id 
-        FROM Orders 
-        GROUP BY customer_id 
-        HAVING COUNT(*) > 1
-    ) THEN o.customer_id END) as returning_customers,
-    COUNT(DISTINCT CASE WHEN o.customer_id NOT IN (
-        SELECT customer_id 
-        FROM Orders 
-        GROUP BY customer_id 
-        HAVING COUNT(*) > 1
-    ) THEN o.customer_id END) as new_customers,
-    AVG(o.total_amount) as average_spending,
-    HOUR(o.order_datetime) as order_hour,
-    COUNT(*) as orders_per_hour
-FROM Orders o
-WHERE o.is_deleted = FALSE
-GROUP BY DATE_FORMAT(o.order_datetime, '%Y-%m'), HOUR(o.order_datetime);
-
-CREATE OR REPLACE VIEW `ProfitMarginReport` AS
-SELECT 
-    d.dish_id,
-    d.name as dish_name,
-    d.selling_price,
-    SUM(di.quantity_needed * i.cost_per_unit) as total_cost,
-    (d.selling_price - SUM(di.quantity_needed * i.cost_per_unit)) as profit,
-    ((d.selling_price - SUM(di.quantity_needed * i.cost_per_unit)) / d.selling_price * 100) as profit_margin
-FROM Dishes d
-JOIN DishIngredients di ON d.dish_id = di.dish_id
-JOIN Ingredients i ON di.ingredient_id = i.ingredient_id
-WHERE d.is_deleted = FALSE
-GROUP BY d.dish_id;

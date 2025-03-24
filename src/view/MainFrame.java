@@ -7,7 +7,6 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import controller.RestaurantController;
 import view.panels.*;
-import java.sql.SQLException;
 
 public class MainFrame extends JFrame {
     private JTabbedPane tabbedPane;
@@ -24,70 +23,56 @@ public class MainFrame extends JFrame {
         setSize(1200, 800);
         setLocationRelativeTo(null);
 
-        try {
-            // Initialize controller
-            controller = new RestaurantController();
+        // Initialize controller
+        controller = new RestaurantController();
 
-            // Initialize layout
-            cardLayout = new CardLayout();
-            mainPanel = new JPanel(cardLayout);
+        // Initialize layout
+        cardLayout = new CardLayout();
+        mainPanel = new JPanel(cardLayout);
 
-            // Initialize components
-            initComponents();
-            initMenuBar();
+        // Initialize components
+        initComponents();
+        initMenuBar();
 
-            // Add panels to card layout
-            mainPanel.add(tabbedPane, "Main");
+        // Add panels to card layout
+        mainPanel.add(tabbedPane, "Main");
+        
+        deletedRecordsPanel = new DeletedRecordsPanel(controller, this);
+        mainPanel.add(deletedRecordsPanel, "DeletedRecords");
 
-            deletedRecordsPanel = new DeletedRecordsPanel(controller, this);
-            mainPanel.add(deletedRecordsPanel, "DeletedRecords");
-
-            // Show the main panel
-            add(mainPanel);
-            cardLayout.show(mainPanel, "Main");
-
-        } catch (RuntimeException e) {
-            JOptionPane.showMessageDialog(this, "Error initializing system: " + e.getMessage());
-            System.exit(1);
-        }
+        // Show the main panel
+        add(mainPanel);
+        cardLayout.show(mainPanel, "Main");
     }
 
     private void initComponents() {
         tabbedPane = new JTabbedPane();
-
-        try {
-            // Add main tabs
-            tabbedPane.addTab("Customers", new CustomerPanel(controller));
-            tabbedPane.addTab("Transactions", new TransactionsPanel(controller));  // This already contains Orders, Payments, and Shifts
-            tabbedPane.addTab("Employees", new EmployeePanel(controller));
-            tabbedPane.addTab("Suppliers", new SupplierPanel(controller));
-            tabbedPane.addTab("Dishes", new DishPanel(controller));
-            tabbedPane.addTab("Ingredients", new IngredientPanel(controller));  // Added new Ingredients tab
-            tabbedPane.addTab("Reports", new ReportsPanel(controller));
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this,
-                    "Error initializing components: " + e.getMessage(),
-                    "Initialization Error",
-                    JOptionPane.ERROR_MESSAGE);
-            System.exit(1);
-        }
+        
+        // Add main tabs
+        tabbedPane.addTab("Customers", new CustomerPanel(controller));
+        tabbedPane.addTab("Transactions", new TransactionsPanel(controller));  // This already contains Orders, Payments, and Shifts
+        tabbedPane.addTab("Employees", new EmployeePanel(controller));
+        tabbedPane.addTab("Suppliers", new SupplierPanel(controller));
+        tabbedPane.addTab("Dishes", new DishPanel(controller));
+        tabbedPane.addTab("Ingredients", new IngredientPanel(controller));  // Added new Ingredients tab
+        tabbedPane.addTab("Reports", new ReportsPanel(controller));
     }
 
     private void initMenuBar() {
         menuBar = new JMenuBar();
-
+        
         // File menu
         JMenu fileMenu = new JMenu("File");
         JMenuItem exitItem = new JMenuItem("Exit");
         exitItem.addActionListener(e -> System.exit(0));
         fileMenu.add(exitItem);
-
+        
         // View menu
         JMenu viewMenu = new JMenu("View");
         viewDeletedRecordsItem = new JMenuItem("View Deleted Records");
         viewDeletedRecordsItem.addActionListener(e -> showDeletedRecordsPanel());
         viewMenu.add(viewDeletedRecordsItem);
-
+        
         menuBar.add(fileMenu);
         menuBar.add(viewMenu);
         setJMenuBar(menuBar);
@@ -112,8 +97,8 @@ public class MainFrame extends JFrame {
         }
 
         SwingUtilities.invokeLater(() -> {
-            LoginView loginView = new LoginView();
-            loginView.setVisible(true);
+            MainFrame frame = new MainFrame();
+            frame.setVisible(true);
         });
     }
 } 

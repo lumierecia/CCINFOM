@@ -1,7 +1,6 @@
 package view;
 
 import controller.RestaurantController;
-import util.StyledComponents;
 import javax.swing.*;
 import java.awt.*;
 
@@ -18,7 +17,8 @@ public class TransactionsPanel extends JPanel {
         setLayout(new BorderLayout());
 
         // Create help button
-        helpButton = StyledComponents.createStyledButton("Help", new Color(108, 117, 125));
+        helpButton = new JButton("Help");
+        helpButton.setIcon(new ImageIcon(getClass().getResource("/icons/help.png")));
         helpButton.addActionListener(e -> showHelp());
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         topPanel.add(helpButton);
@@ -45,36 +45,7 @@ public class TransactionsPanel extends JPanel {
     }
 
     private void showHelp() {
-        String helpText = """
-            Transactions Management Help:
-            
-            1. Orders Tab:
-               • Create and manage customer orders
-               • Add items to orders
-               • Track order status
-               • View order history
-            
-            2. Payments Tab:
-               • Process payments for orders
-               • View unpaid orders
-               • Generate receipts
-               • Track payment status
-            
-            3. Shifts Tab:
-               • Manage employee shifts
-               • Track attendance
-               • View shift schedules
-               • Monitor employee hours
-            
-            4. Additional Features:
-               • Switch between tabs for different functions
-               • Use the help button in each tab for specific guidance
-               • All changes are saved automatically
-            """;
-        
-        JOptionPane.showMessageDialog(this,
-            helpText,
-            "Transactions Management Help",
-            JOptionPane.INFORMATION_MESSAGE);
+        HelpDialog helpDialog = new HelpDialog(SwingUtilities.getWindowAncestor(this), "Transactions");
+        helpDialog.setVisible(true);
     }
 } 

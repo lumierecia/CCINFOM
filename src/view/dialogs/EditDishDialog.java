@@ -5,7 +5,6 @@ import model.Dish;
 
 import javax.swing.*;
 import java.awt.*;
-import java.sql.SQLException;
 import java.util.List;
 
 public class EditDishDialog extends JDialog {
@@ -48,18 +47,11 @@ public class EditDishDialog extends JDialog {
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         categoryComboBox = new JComboBox<>();
-        try {
-            List<String> categories = controller.getAllCategories();
-            for (String category : categories) {
-                categoryComboBox.addItem(category);
-            }
-            categoryComboBox.setSelectedItem(dish.getCategoryName());
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Failed to load categories: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
+        List<String> categories = controller.getAllCategories();
+        for (String category : categories) {
+            categoryComboBox.addItem(category);
         }
+        categoryComboBox.setSelectedItem(dish.getCategoryName());
         mainPanel.add(categoryComboBox, gbc);
 
         // Price spinner
@@ -119,9 +111,9 @@ public class EditDishDialog extends JDialog {
         String name = nameField.getText().trim();
         if (name.isEmpty()) {
             JOptionPane.showMessageDialog(this,
-                    "Please enter a dish name.",
-                    "Validation Error",
-                    JOptionPane.ERROR_MESSAGE);
+                "Please enter a dish name.",
+                "Validation Error",
+                JOptionPane.ERROR_MESSAGE);
             return;
         }
 
@@ -136,21 +128,9 @@ public class EditDishDialog extends JDialog {
         dish.setRecipeInstructions(recipe);
         dish.setAvailable(available);
 
-        try {
-            if (controller.updateDish(dish)) {
-                dishUpdated = true;
-                dispose();
-            } else {
-                JOptionPane.showMessageDialog(this,
-                        "Failed to update dish. Please try again.",
-                        "Update Error",
-                        JOptionPane.ERROR_MESSAGE);
-            }
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Database error while updating dish: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
+        if (controller.updateDish(dish)) {
+            dishUpdated = true;
+            dispose();
         }
     }
 

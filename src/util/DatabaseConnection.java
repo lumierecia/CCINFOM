@@ -9,7 +9,7 @@ import javax.swing.UIManager;
 public class DatabaseConnection {
     private static final String URL = "jdbc:mysql://localhost:3306/restaurantdb";
     private static final String USER = "root";
-    private static final String PASSWORD = "hoshionna"; // Update this with your actual MySQL root password
+    private static final String PASSWORD = "cgkghj"; // Update this with your actual MySQL root password
     private static Connection connection = null;
 
     public static synchronized Connection getConnection() throws SQLException {

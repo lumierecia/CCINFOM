@@ -13,14 +13,12 @@ import java.util.ArrayList;
 import java.util.Map;
 import model.Dish;
 import model.Ingredient;
-import model.DishIngredient;
 
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.sql.SQLException;
 
 public class OrderHistoryPanel extends JPanel {
     private JTable orderTable;
@@ -54,8 +52,8 @@ public class OrderHistoryPanel extends JPanel {
 
         // Create table
         String[] columnNames = {
-                "Order Date", "Customer Name", "Order Type",
-                "Status", "Total Amount", "Payment Status"
+            "Order Date", "Customer Name", "Order Type", 
+            "Status", "Total Amount", "Payment Status"
         };
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
@@ -78,9 +76,9 @@ public class OrderHistoryPanel extends JPanel {
                 showOrderDetailsDialog(orderId);
             } else {
                 JOptionPane.showMessageDialog(this,
-                        "Please select an order to view.",
-                        "No Selection",
-                        JOptionPane.WARNING_MESSAGE);
+                    "Please select an order to view.",
+                    "No Selection",
+                    JOptionPane.WARNING_MESSAGE);
             }
         });
 
@@ -89,24 +87,24 @@ public class OrderHistoryPanel extends JPanel {
             if (selectedRow != -1) {
                 int orderId = orderIds.get(selectedRow);
                 int confirm = JOptionPane.showConfirmDialog(this,
-                        "Are you sure you want to delete this order?",
-                        "Confirm Delete",
-                        JOptionPane.YES_NO_OPTION);
+                    "Are you sure you want to delete this order?",
+                    "Confirm Delete",
+                    JOptionPane.YES_NO_OPTION);
                 if (confirm == JOptionPane.YES_OPTION) {
                     if (controller.deleteOrder(orderId)) {
                         loadOrders();
                     } else {
                         JOptionPane.showMessageDialog(this,
-                                "Failed to delete order.",
-                                "Error",
-                                JOptionPane.ERROR_MESSAGE);
+                            "Failed to delete order.",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE);
                     }
                 }
             } else {
                 JOptionPane.showMessageDialog(this,
-                        "Please select an order to delete.",
-                        "No Selection",
-                        JOptionPane.WARNING_MESSAGE);
+                    "Please select an order to delete.",
+                    "No Selection",
+                    JOptionPane.WARNING_MESSAGE);
             }
         });
 
@@ -119,16 +117,16 @@ public class OrderHistoryPanel extends JPanel {
         orderIds.clear();
         List<Order> orders = controller.getAllOrders();
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-
+        
         for (Order order : orders) {
             orderIds.add(order.getOrderId());
             Object[] row = {
-                    dateFormat.format(order.getOrderDateTime()),
-                    order.getCustomerName(),
-                    order.getOrderType(),
-                    order.getOrderStatus(),
-                    String.format("₱%.2f", order.getTotalAmount()),
-                    order.getPaymentStatus()
+                dateFormat.format(order.getOrderDateTime()),
+                order.getCustomerName(),
+                order.getOrderType(),
+                order.getOrderStatus(),
+                String.format("₱%.2f", order.getTotalAmount()),
+                order.getPaymentStatus()
             };
             tableModel.addRow(row);
         }
@@ -139,7 +137,7 @@ public class OrderHistoryPanel extends JPanel {
         if (order == null) return;
 
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-                "Order Details", true);
+            "Order Details", true);
         dialog.setLayout(new BorderLayout(10, 10));
         JPanel contentPane = new JPanel(new BorderLayout(10, 10));
         contentPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -181,8 +179,8 @@ public class OrderHistoryPanel extends JPanel {
                 int column = itemsTable.getColumnModel().getColumnIndexAtX(e.getX());
                 int row = e.getY() / itemsTable.getRowHeight();
 
-                if (row < itemsTable.getRowCount() && row >= 0 &&
-                        column < itemsTable.getColumnCount() && column >= 0) {
+                if (row < itemsTable.getRowCount() && row >= 0 && 
+                    column < itemsTable.getColumnCount() && column >= 0) {
                     if (column == 4) {  // Ingredients button column
                         OrderItem item = order.getItems().get(row);
                         showIngredientDetailsDialog(item);
@@ -193,11 +191,11 @@ public class OrderHistoryPanel extends JPanel {
 
         for (OrderItem item : order.getItems()) {
             Object[] row = {
-                    item.getDishName(),
-                    item.getQuantity(),
-                    String.format("₱%.2f", item.getPriceAtTime()),
-                    String.format("₱%.2f", item.getQuantity() * item.getPriceAtTime()),
-                    "View Ingredients"  // Button text
+                item.getDishName(),
+                item.getQuantity(),
+                String.format("₱%.2f", item.getPriceAtTime()),
+                String.format("₱%.2f", item.getQuantity() * item.getPriceAtTime()),
+                "View Ingredients"  // Button text
             };
             itemsModel.addRow(row);
         }
@@ -218,98 +216,91 @@ public class OrderHistoryPanel extends JPanel {
     }
 
     private void showIngredientDetailsDialog(OrderItem item) {
-        try {
-            Dish dish = controller.getDishById(item.getDishId());
-            if (dish == null) return;
+        Dish dish = controller.getDishById(item.getDishId());
+        if (dish == null) return;
 
-            JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-                    "Dish Ingredients", true);
-            dialog.setLayout(new BorderLayout(10, 10));
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
+            "Dish Ingredients", true);
+        dialog.setLayout(new BorderLayout(10, 10));
 
-            // Create info panel
-            JPanel infoPanel = new JPanel(new GridLayout(3, 1, 5, 5));
-            infoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        // Create info panel
+        JPanel infoPanel = new JPanel(new GridLayout(3, 1, 5, 5));
+        infoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        JLabel nameLabel = new JLabel("Dish: " + dish.getName());
+        nameLabel.setFont(nameLabel.getFont().deriveFont(Font.BOLD));
+        infoPanel.add(nameLabel);
+        
+        JLabel quantityLabel = new JLabel("Quantity Ordered: " + item.getQuantity());
+        infoPanel.add(quantityLabel);
+        
+        JLabel priceLabel = new JLabel(String.format("Price at Time: ₱%.2f", item.getPriceAtTime()));
+        infoPanel.add(priceLabel);
 
-            JLabel nameLabel = new JLabel("Dish: " + dish.getName());
-            nameLabel.setFont(nameLabel.getFont().deriveFont(Font.BOLD));
-            infoPanel.add(nameLabel);
-
-            JLabel quantityLabel = new JLabel("Quantity Ordered: " + item.getQuantity());
-            infoPanel.add(quantityLabel);
-
-            JLabel priceLabel = new JLabel(String.format("Price at Time: ₱%.2f", item.getPriceAtTime()));
-            infoPanel.add(priceLabel);
-
-            // Create ingredients table
-            String[] columns = {"Ingredient", "Required Amount", "Total Required"};
-            DefaultTableModel ingredientModel = new DefaultTableModel(columns, 0) {
-                @Override
-                public boolean isCellEditable(int row, int column) {
-                    return false;
-                }
-            };
-            JTable ingredientTable = new JTable(ingredientModel);
-
-            // Get ingredients for this dish
-            List<DishIngredient> dishIngredients = controller.getDishIngredients(dish.getDishId());
-            for (DishIngredient dishIngredient : dishIngredients) {
-                Ingredient ingredient = controller.getIngredientById(dishIngredient.getIngredientId());
-                if (ingredient != null) {
-                    double requiredPerDish = dishIngredient.getQuantityNeeded();
-                    double totalRequired = requiredPerDish * item.getQuantity();
-                    Object[] row = {
-                            ingredient.getName(),
-                            String.format("%.2f %s", requiredPerDish, ingredient.getUnitName()),
-                            String.format("%.2f %s", totalRequired, ingredient.getUnitName())
-                    };
-                    ingredientModel.addRow(row);
-                }
+        // Create ingredients table
+        String[] columns = {"Ingredient", "Required Amount", "Total Required"};
+        DefaultTableModel ingredientModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
             }
+        };
+        JTable ingredientTable = new JTable(ingredientModel);
 
-            // Add recipe instructions if available
-            if (dish.getRecipeInstructions() != null && !dish.getRecipeInstructions().trim().isEmpty()) {
-                JTextArea recipeArea = new JTextArea(dish.getRecipeInstructions());
-                recipeArea.setEditable(false);
-                recipeArea.setLineWrap(true);
-                recipeArea.setWrapStyleWord(true);
-                recipeArea.setBackground(new Color(250, 250, 250));
-                recipeArea.setBorder(BorderFactory.createTitledBorder("Recipe Instructions"));
-
-                JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
-                contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                contentPanel.add(infoPanel, BorderLayout.NORTH);
-                contentPanel.add(new JScrollPane(ingredientTable), BorderLayout.CENTER);
-                contentPanel.add(new JScrollPane(recipeArea), BorderLayout.SOUTH);
-                dialog.add(contentPanel, BorderLayout.CENTER);
-            } else {
-                JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
-                contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                contentPanel.add(infoPanel, BorderLayout.NORTH);
-                contentPanel.add(new JScrollPane(ingredientTable), BorderLayout.CENTER);
-                dialog.add(contentPanel, BorderLayout.CENTER);
+        // Get ingredients for this dish
+        Map<Integer, Double> requiredIngredients = controller.getDishIngredients(dish.getDishId());
+        for (Map.Entry<Integer, Double> entry : requiredIngredients.entrySet()) {
+            Ingredient ingredient = controller.getIngredientById(entry.getKey());
+            if (ingredient != null) {
+                double requiredPerDish = entry.getValue();
+                double totalRequired = requiredPerDish * item.getQuantity();
+                Object[] row = {
+                    ingredient.getName(),
+                    String.format("%.2f %s", requiredPerDish, ingredient.getUnitName()),
+                    String.format("%.2f %s", totalRequired, ingredient.getUnitName())
+                };
+                ingredientModel.addRow(row);
             }
-
-            // Add close button
-            JButton closeButton = new JButton("Close");
-            closeButton.addActionListener(e -> dialog.dispose());
-            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-            buttonPanel.add(closeButton);
-            dialog.add(buttonPanel, BorderLayout.SOUTH);
-
-            // Show dialog
-            dialog.pack();
-            dialog.setSize(new Dimension(
-                    Math.max(dialog.getWidth(), 500),
-                    Math.max(dialog.getHeight(), 400)
-            ));
-            dialog.setLocationRelativeTo(this);
-            dialog.setVisible(true);
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Error loading dish details: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
         }
+
+        // Add recipe instructions if available
+        if (dish.getRecipeInstructions() != null && !dish.getRecipeInstructions().trim().isEmpty()) {
+            JTextArea recipeArea = new JTextArea(dish.getRecipeInstructions());
+            recipeArea.setEditable(false);
+            recipeArea.setLineWrap(true);
+            recipeArea.setWrapStyleWord(true);
+            recipeArea.setBackground(new Color(250, 250, 250));
+            recipeArea.setBorder(BorderFactory.createTitledBorder("Recipe Instructions"));
+            
+            JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
+            contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            contentPanel.add(infoPanel, BorderLayout.NORTH);
+            contentPanel.add(new JScrollPane(ingredientTable), BorderLayout.CENTER);
+            contentPanel.add(new JScrollPane(recipeArea), BorderLayout.SOUTH);
+            dialog.add(contentPanel, BorderLayout.CENTER);
+        } else {
+            JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
+            contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            contentPanel.add(infoPanel, BorderLayout.NORTH);
+            contentPanel.add(new JScrollPane(ingredientTable), BorderLayout.CENTER);
+            dialog.add(contentPanel, BorderLayout.CENTER);
+        }
+
+        // Add close button
+        JButton closeButton = new JButton("Close");
+        closeButton.addActionListener(e -> dialog.dispose());
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(closeButton);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
+
+        // Show dialog
+        dialog.pack();
+        dialog.setSize(new Dimension(
+            Math.max(dialog.getWidth(), 500),
+            Math.max(dialog.getHeight(), 400)
+        ));
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
     }
 
     // Button renderer for the ingredients button column
@@ -321,7 +312,7 @@ public class OrderHistoryPanel extends JPanel {
 
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value,
-                                                       boolean isSelected, boolean hasFocus, int row, int column) {
+                boolean isSelected, boolean hasFocus, int row, int column) {
             if (isSelected) {
                 setForeground(table.getSelectionForeground());
                 setBackground(table.getSelectionBackground());
@@ -348,7 +339,7 @@ public class OrderHistoryPanel extends JPanel {
 
         @Override
         public Component getTableCellEditorComponent(JTable table, Object value,
-                                                     boolean isSelected, int row, int column) {
+                boolean isSelected, int row, int column) {
             if (isSelected) {
                 button.setForeground(table.getSelectionForeground());
                 button.setBackground(table.getSelectionBackground());
@@ -390,8 +381,8 @@ public class OrderHistoryPanel extends JPanel {
         button.setForeground(Color.BLACK);
         button.setFocusPainted(false);
         button.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(backgroundColor.darker(), 1),
-                BorderFactory.createEmptyBorder(8, 15, 8, 15)
+            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
         ));
 
         button.addMouseListener(new MouseListener() {
