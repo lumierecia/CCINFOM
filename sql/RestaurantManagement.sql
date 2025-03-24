@@ -238,7 +238,9 @@ INSERT INTO Ingredients (name, unit_id, quantity_in_stock, minimum_stock_level, 
 ('Potatoes', 1, 40.00, 8.00, 60.00, 1),         -- 18: kg
 ('Mayonnaise', 1, 10.00, 2.00, 150.00, 1),      -- 19: kg
 ('Kangkong', 1, 20.00, 5.00, 80.00, 1),         -- 20: kg
-('Radish', 1, 15.00, 3.00, 70.00, 1);           -- 21: kg
+('Radish', 1, 15.00, 3.00, 70.00, 1),           -- 21: kg
+('Ice', 1, 50.00, 10.00, 20.00, 1),             -- 22: kg
+('Tea', 1, 10.00, 2.00, 200.00, 1);             -- 23: kg
 
 INSERT INTO IngredientSuppliers (ingredient_id, supplier_id, unit_price, lead_time_days, minimum_order_quantity, is_primary_supplier) VALUES
 (1, 1, 48.00, 2, 50.00, TRUE),   -- Rice from Metro
@@ -252,7 +254,9 @@ INSERT INTO IngredientSuppliers (ingredient_id, supplier_id, unit_price, lead_ti
 (9, 1, 87.00, 2, 5.00, TRUE),    -- Onion from Metro
 (10, 1, 92.00, 2, 5.00, TRUE),   -- Tomato from Metro
 (20, 1, 75.00, 1, 5.00, TRUE),   -- Kangkong from Metro
-(21, 1, 65.00, 1, 5.00, TRUE);   -- Radish from Metro
+(21, 1, 65.00, 1, 5.00, TRUE),   -- Radish from Metro
+(22, 3, 18.00, 1, 20.00, TRUE),  -- Ice from Quality
+(23, 3, 190.00, 3, 2.00, TRUE);  -- Tea from Quality
 
 INSERT INTO Dishes (name, category_id, selling_price, recipe_instructions) VALUES
 ('Pork Sinigang', 1, 250.00, 'Boil pork with vegetables in tamarind-based soup until tender.'),
@@ -269,21 +273,60 @@ INSERT INTO Dishes (name, category_id, selling_price, recipe_instructions) VALUE
 
 INSERT INTO DishIngredients (dish_id, ingredient_id, quantity_needed, unit_id) VALUES
 -- Pork Sinigang (dish_id = 1)
-(1, 2, 0.3, 1),    -- Pork, 0.3 kg
-(1, 9, 0.1, 1),    -- Onion, 0.1 kg
-(1, 10, 0.2, 1),   -- Tomato, 0.2 kg
-(1, 11, 0.05, 1),  -- Tamarind Base, 0.05 kg
+(1, 2, 1.5, 1),    -- Pork, 1.5 kg
+(1, 9, 0.2, 1),    -- Onion, 0.2 kg
+(1, 10, 0.3, 1),   -- Tomato, 0.3 kg
+(1, 11, 0.2, 1),   -- Tamarind Base, 0.2 kg
+(1, 20, 0.3, 1),   -- Kangkong, 0.3 kg
+(1, 21, 0.2, 1),   -- Radish, 0.2 kg
 
 -- Kare-kare (dish_id = 2)
-(2, 4, 0.4, 1),     -- Beef, 0.4 kg
-(2, 12, 0.2, 1),    -- Peanut Butter, 0.2 kg
-(2, 5, 0.05, 2),    -- Cooking Oil, 0.05 liters
+(2, 4, 1.2, 1),     -- Beef, 1.2 kg
+(2, 12, 0.4, 1),    -- Peanut Butter, 0.4 kg
+(2, 9, 0.2, 1),     -- Onion, 0.2 kg
+(2, 8, 0.1, 1),     -- Garlic, 0.1 kg
+(2, 5, 0.1, 2),     -- Cooking Oil, 0.1 liters
 
 -- Chicken Adobo (dish_id = 3)
-(3, 3, 0.3, 1),     -- Chicken, 0.3 kg
-(3, 6, 0.1, 2),     -- Soy Sauce, 0.1 liters
-(3, 7, 0.1, 2),     -- Vinegar, 0.1 liters
-(3, 8, 0.05, 1);    -- Garlic, 0.05 kg
+(3, 3, 1.0, 1),     -- Chicken, 1.0 kg
+(3, 6, 0.3, 2),     -- Soy Sauce, 0.3 liters
+(3, 7, 0.3, 2),     -- Vinegar, 0.3 liters
+(3, 8, 0.1, 1),     -- Garlic, 0.1 kg
+(3, 9, 0.2, 1),     -- Onion, 0.2 kg
+
+-- Sisig (dish_id = 4)
+(4, 2, 1.0, 1),     -- Pork, 1.0 kg
+(4, 9, 0.3, 1),     -- Onion, 0.3 kg
+(4, 19, 0.1, 1),    -- Mayonnaise, 0.1 kg
+(4, 5, 0.1, 2),     -- Cooking Oil, 0.1 liters
+
+-- Burger Steak (dish_id = 5)
+(5, 13, 0.8, 1),    -- Ground Beef, 0.8 kg
+(5, 9, 0.2, 1),     -- Onion, 0.2 kg
+(5, 16, 1.0, 3),    -- Eggs, 1 piece
+(5, 5, 0.1, 2),     -- Cooking Oil, 0.1 liters
+
+-- Halo-halo (dish_id = 6)
+(6, 17, 0.2, 2),    -- Milk, 0.2 liters
+(6, 22, 0.5, 1),    -- Ice, 0.5 kg
+
+-- Leche Flan (dish_id = 7)
+(7, 16, 4.0, 3),    -- Eggs, 4 pieces
+(7, 17, 0.2, 2),    -- Milk, 0.2 liters
+
+-- Mango Shake (dish_id = 8)
+(8, 17, 0.2, 2),    -- Milk, 0.2 liters
+
+-- Bottomless Iced Tea (dish_id = 9)
+(9, 23, 0.1, 1),    -- Tea, 0.1 kg
+
+-- Steamed Rice (dish_id = 10)
+(10, 1, 1.0, 1),    -- Rice, 1.0 kg
+
+-- Mashed Potatoes (dish_id = 11)
+(11, 18, 0.8, 1),   -- Potatoes, 0.8 kg
+(11, 17, 0.1, 2),   -- Milk, 0.1 liters
+(11, 5, 0.05, 2);   -- Cooking Oil, 0.05 liters
 
 INSERT INTO Customers (last_name, first_name, email, phonenumber, address) VALUES
 ('Smith', 'John', 'john.smith@example.com', '09171234567', '123 Main St, Cityville'),      -- 1
