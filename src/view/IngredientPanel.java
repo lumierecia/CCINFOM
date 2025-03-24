@@ -2,9 +2,6 @@ package view;
 
 import controller.RestaurantController;
 import model.Ingredient;
-import model.IngredientBatch;
-import model.Supplier;
-import view.dialogs.AddBatchDialog;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -12,20 +9,13 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Date;
 
 public class IngredientPanel extends JPanel {
     private final RestaurantController controller;
-    private JTabbedPane tabbedPane;
     private JTable ingredientTable;
-    private JTable batchTable;
     private DefaultTableModel ingredientTableModel;
-    private DefaultTableModel batchTableModel;
     private List<Integer> ingredientIds = new ArrayList<>();
-    private List<Integer> batchIds = new ArrayList<>();
     private JCheckBox lowStockCheckBox;
-    private JCheckBox expiringBatchesCheckBox;
-    private JSpinner expiryDaysSpinner;
 
     public IngredientPanel(RestaurantController controller) {
         this.controller = controller;
@@ -35,11 +25,8 @@ public class IngredientPanel extends JPanel {
     }
 
     private void initComponents() {
-        // Create tabbed pane
-        tabbedPane = new JTabbedPane();
-        
-        // Initialize Ingredients tab
-        JPanel ingredientsTab = new JPanel(new BorderLayout());
+        // Create main panel
+        JPanel mainPanel = new JPanel(new BorderLayout());
         
         // Create toolbar for ingredients
         JPanel ingredientToolbar = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -68,139 +55,75 @@ public class IngredientPanel extends JPanel {
         };
         ingredientTable = new JTable(ingredientTableModel);
         
-        // Add components to ingredients tab
+        // Add components to main panel
         JPanel northPanel = new JPanel(new BorderLayout());
         northPanel.add(ingredientToolbar, BorderLayout.NORTH);
         northPanel.add(filterPanel, BorderLayout.SOUTH);
-        ingredientsTab.add(northPanel, BorderLayout.NORTH);
-        ingredientsTab.add(new JScrollPane(ingredientTable), BorderLayout.CENTER);
-        
-        // Initialize Batches tab
-        JPanel batchesTab = new JPanel(new BorderLayout());
-        
-        // Create toolbar for batches
-        JPanel batchToolbar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JButton addBatchBtn = createStyledButton("Add Batch", new Color(40, 167, 69));
-        JButton viewBatchDetailsBtn = createStyledButton("View Details", new Color(70, 130, 180));
-        
-        batchToolbar.add(addBatchBtn);
-        batchToolbar.add(viewBatchDetailsBtn);
-        
-        // Create batch filter panel
-        JPanel batchFilterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        expiringBatchesCheckBox = new JCheckBox("Show Expiring Within");
-        expiryDaysSpinner = new JSpinner(new SpinnerNumberModel(30, 1, 365, 1));
-        JLabel daysLabel = new JLabel("days");
-        batchFilterPanel.add(expiringBatchesCheckBox);
-        batchFilterPanel.add(expiryDaysSpinner);
-        batchFilterPanel.add(daysLabel);
-        
-        // Create batches table
-        String[] batchColumns = {"Ingredient", "Supplier", "Quantity", "Remaining", "Purchase Date", "Expiry Date", "Status"};
-        batchTableModel = new DefaultTableModel(batchColumns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        batchTable = new JTable(batchTableModel);
-        
-        // Add components to batches tab
-        JPanel batchNorthPanel = new JPanel(new BorderLayout());
-        batchNorthPanel.add(batchToolbar, BorderLayout.NORTH);
-        batchNorthPanel.add(batchFilterPanel, BorderLayout.SOUTH);
-        batchesTab.add(batchNorthPanel, BorderLayout.NORTH);
-        batchesTab.add(new JScrollPane(batchTable), BorderLayout.CENTER);
-        
-        // Add tabs to tabbed pane
-        tabbedPane.addTab("Ingredients", ingredientsTab);
-        tabbedPane.addTab("Batches", batchesTab);
-        
-        // Add tabbed pane to panel
-        add(tabbedPane, BorderLayout.CENTER);
-        
-        // Add action listeners
+        mainPanel.add(northPanel, BorderLayout.NORTH);
+        mainPanel.add(new JScrollPane(ingredientTable), BorderLayout.CENTER);
+
+        // Add button listeners
         addIngredientBtn.addActionListener(e -> showAddIngredientDialog());
-        editIngredientBtn.addActionListener(e -> showEditIngredientDialog());
+        editIngredientBtn.addActionListener(e -> editSelectedIngredient());
         deleteIngredientBtn.addActionListener(e -> deleteSelectedIngredient());
-        helpBtn.addActionListener(e -> showHelpDialog());
-        addBatchBtn.addActionListener(e -> showAddBatchDialog());
-        viewBatchDetailsBtn.addActionListener(e -> showBatchDetails());
+        helpBtn.addActionListener(e -> showHelp());
         
-        // Add filter listeners
-        lowStockCheckBox.addActionListener(e -> refreshIngredientTable());
-        expiringBatchesCheckBox.addActionListener(e -> refreshBatchTable());
-        expiryDaysSpinner.addChangeListener(e -> {
-            if (expiringBatchesCheckBox.isSelected()) {
-                refreshBatchTable();
-            }
-        });
+        // Add filter listener
+        lowStockCheckBox.addActionListener(e -> loadData());
+        
+        add(mainPanel);
     }
 
     private void loadData() {
-        refreshIngredientTable();
-        refreshBatchTable();
-    }
-
-    private void refreshIngredientTable() {
         ingredientTableModel.setRowCount(0);
         ingredientIds.clear();
         
-        List<Ingredient> ingredients;
-        if (lowStockCheckBox.isSelected()) {
-            ingredients = controller.getLowStockIngredients();
-        } else {
-            ingredients = controller.getAllIngredients();
-        }
+        List<Ingredient> ingredients = controller.getAllIngredients();
+        boolean showLowStockOnly = lowStockCheckBox.isSelected();
         
         for (Ingredient ingredient : ingredients) {
-            Supplier primarySupplier = controller.getPrimarySupplierForIngredient(ingredient.getIngredientId());
-            String supplierName = primarySupplier != null ? primarySupplier.getName() : "None";
+            if (ingredient.isDeleted()) continue;
+            if (showLowStockOnly && ingredient.getQuantityInStock() > ingredient.getMinimumStockLevel()) continue;
             
             ingredientIds.add(ingredient.getIngredientId());
-            Object[] row = {
+            String status = ingredient.getQuantityInStock() <= ingredient.getMinimumStockLevel() ? "Low Stock" : "In Stock";
+            
+            ingredientTableModel.addRow(new Object[]{
                 ingredient.getName(),
                 ingredient.getUnitName(),
                 ingredient.getQuantityInStock(),
                 ingredient.getMinimumStockLevel(),
-                String.format("₱%.2f", ingredient.getCostPerUnit()),
-                ingredient.getQuantityInStock() < ingredient.getMinimumStockLevel() ? "Low Stock" : "OK",
-                supplierName
-            };
-            ingredientTableModel.addRow(row);
+                String.format("%.2f", ingredient.getCostPerUnit()),
+                status,
+                "N/A"
+            });
         }
     }
 
-    private void refreshBatchTable() {
-        batchTableModel.setRowCount(0);
-        batchIds.clear();
-        
-        List<IngredientBatch> batches;
-        if (expiringBatchesCheckBox.isSelected()) {
-            int days = (Integer) expiryDaysSpinner.getValue();
-            batches = controller.getExpiringBatches(days);
-        } else {
-            batches = controller.getAllIngredientBatches();
-        }
-        
-        for (IngredientBatch batch : batches) {
-            Ingredient ingredient = controller.getIngredientById(batch.getIngredientId());
-            Supplier supplier = controller.getSupplierById(batch.getSupplierId());
-            
-            if (ingredient != null && supplier != null) {
-                batchIds.add(batch.getBatchId());
-                Object[] row = {
-                    ingredient.getName(),
-                    supplier.getName(),
-                    batch.getQuantity(),
-                    batch.getRemainingQuantity(),
-                    batch.getPurchaseDate(),
-                    batch.getExpiryDate(),
-                    batch.getStatus()
-                };
-                batchTableModel.addRow(row);
+    private JButton createStyledButton(String text, Color backgroundColor) {
+        JButton button = new JButton(text);
+        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
+        button.setBackground(backgroundColor);
+        button.setForeground(Color.BLACK    );
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(backgroundColor.brighter());
             }
-        }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(backgroundColor);
+            }
+        });
+
+        return button;
     }
 
     private void showAddIngredientDialog() {
@@ -268,16 +191,14 @@ public class IngredientPanel extends JPanel {
             // Create new ingredient
             Ingredient ingredient = new Ingredient();
             ingredient.setName(name);
-            ingredient.setUnitId(unitCombo.getSelectedIndex() + 1); // Unit IDs start from 1
+            ingredient.setUnitId(unitCombo.getSelectedIndex() + 1);
             ingredient.setUnitName((String) unitCombo.getSelectedItem());
             ingredient.setQuantityInStock((Double) stockSpinner.getValue());
             ingredient.setMinimumStockLevel((Double) minStockSpinner.getValue());
             ingredient.setCostPerUnit((Double) costSpinner.getValue());
-            ingredient.setLastRestockDate(new Date());
-            ingredient.setLastRestockedBy(1); // Default to admin ID 1
             
             if (controller.addIngredient(ingredient)) {
-                refreshIngredientTable();
+                loadData();
                 dialog.dispose();
                 JOptionPane.showMessageDialog(this,
                     "Ingredient added successfully!",
@@ -303,7 +224,7 @@ public class IngredientPanel extends JPanel {
         dialog.setVisible(true);
     }
 
-    private void showEditIngredientDialog() {
+    private void editSelectedIngredient() {
         int selectedRow = ingredientTable.getSelectedRow();
         if (selectedRow < 0) {
             JOptionPane.showMessageDialog(this,
@@ -337,7 +258,7 @@ public class IngredientPanel extends JPanel {
         // Add form fields
         JTextField nameField = new JTextField(ingredient.getName(), 20);
         JComboBox<String> unitCombo = new JComboBox<>(new String[]{"kg", "liters", "pieces", "grams", "milliliters"});
-        unitCombo.setSelectedIndex(ingredient.getUnitId() - 1); // Unit IDs start from 1
+        unitCombo.setSelectedIndex(ingredient.getUnitId() - 1);
         JSpinner stockSpinner = new JSpinner(new SpinnerNumberModel(ingredient.getQuantityInStock(), 0.0, 10000.0, 0.1));
         JSpinner minStockSpinner = new JSpinner(new SpinnerNumberModel(ingredient.getMinimumStockLevel(), 0.0, 10000.0, 0.1));
         JSpinner costSpinner = new JSpinner(new SpinnerNumberModel(ingredient.getCostPerUnit(), 0.0, 10000.0, 0.1));
@@ -392,10 +313,9 @@ public class IngredientPanel extends JPanel {
             ingredient.setQuantityInStock((Double) stockSpinner.getValue());
             ingredient.setMinimumStockLevel((Double) minStockSpinner.getValue());
             ingredient.setCostPerUnit((Double) costSpinner.getValue());
-            ingredient.setLastRestockDate(new Date());
             
             if (controller.updateIngredient(ingredient)) {
-                refreshIngredientTable();
+                loadData();
                 dialog.dispose();
                 JOptionPane.showMessageDialog(this,
                     "Ingredient updated successfully!",
@@ -436,7 +356,7 @@ public class IngredientPanel extends JPanel {
             
             if (confirm == JOptionPane.YES_OPTION) {
                 if (controller.deleteIngredient(ingredientId)) {
-                    refreshIngredientTable();
+                    loadData();
                     JOptionPane.showMessageDialog(
                         this,
                         "Ingredient deleted successfully",
@@ -452,147 +372,29 @@ public class IngredientPanel extends JPanel {
                     );
                 }
             }
-        }
-    }
-
-    private void showAddBatchDialog() {
-        int selectedRow = ingredientTable.getSelectedRow();
-        if (selectedRow < 0) {
-            JOptionPane.showMessageDialog(
-                this,
-                "Please select an ingredient first",
+        } else {
+            JOptionPane.showMessageDialog(this,
+                "Please select an ingredient to delete.",
                 "No Selection",
-                JOptionPane.WARNING_MESSAGE
-            );
-            return;
-        }
-
-        int ingredientId = ingredientIds.get(selectedRow);
-        Ingredient ingredient = controller.getIngredientById(ingredientId);
-        
-        if (ingredient != null) {
-            AddBatchDialog dialog = new AddBatchDialog(
-                (Frame) SwingUtilities.getWindowAncestor(this),
-                ingredient,
-                controller
-            );
-            dialog.setVisible(true);
-            
-            // Refresh tables after adding a batch
-            if (dialog.isSuccess()) {
-                refreshIngredientTable();
-                refreshBatchTable();
-            }
+                JOptionPane.WARNING_MESSAGE);
         }
     }
 
-    private void showBatchDetails() {
-        int selectedRow = batchTable.getSelectedRow();
-        if (selectedRow >= 0) {
-            int batchId = batchIds.get(selectedRow);
-            IngredientBatch batch = controller.getIngredientBatchById(batchId);
+    private void showHelp() {
+        JOptionPane.showMessageDialog(this,
+            """
+            Ingredient Management Help:
             
-            if (batch != null) {
-                // Show batch details in a dialog
-                JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-                    "Batch Details", true);
-                // ... implement batch details dialog
-            }
-        }
+            1. Add Ingredient: Add a new ingredient to the inventory
+            2. Edit Ingredient: Modify existing ingredient details
+            3. Delete Ingredient: Remove an ingredient from the system
+            4. Low Stock Filter: Show only ingredients below minimum stock level
+            
+            Status Colors:
+            - In Stock: Normal stock levels
+            - Low Stock: Below minimum stock level
+            """,
+            "Help",
+            JOptionPane.INFORMATION_MESSAGE);
     }
-
-    private void showHelpDialog() {
-        String helpText = """
-            Ingredient Management Help
-            
-            Overview:
-            The ingredient management system helps you track your restaurant's ingredients,
-            their stock levels, and batch information.
-            
-            Ingredients Tab Features:
-            1. Add Ingredient: Create new ingredients with units and stock levels
-            2. Edit Ingredient: Modify ingredient details and stock thresholds
-            3. Delete Ingredient: Remove unused ingredients
-            4. Low Stock Filter: View only ingredients below minimum stock level
-            
-            Batches Tab Features:
-            1. Add Batch: Record new ingredient deliveries with expiry dates
-            2. View Details: Check batch information and usage history
-            3. Expiry Filter: Monitor batches nearing expiration
-            
-            Stock Management:
-            • Green Status: Stock level is adequate
-            • Red Status: Stock is below minimum threshold
-            • System tracks:
-              - Current stock levels
-              - Minimum stock thresholds
-              - Cost per unit
-              - Primary suppliers
-            
-            Batch Tracking:
-            • Each batch records:
-              - Purchase date
-              - Expiry date
-              - Initial quantity
-              - Remaining quantity
-              - Supplier information
-            
-            Tips:
-            • Regularly check low stock indicators
-            • Monitor expiring batches
-            • Update stock levels after usage
-            • Maintain accurate supplier associations
-            
-            Note: Deleting an ingredient will preserve its historical records
-            but prevent future use in recipes and orders.
-            """;
-        
-        JDialog helpDialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Ingredient Management Help", true);
-        helpDialog.setLayout(new BorderLayout());
-        
-        JTextArea textArea = new JTextArea(helpText);
-        textArea.setEditable(false);
-        textArea.setMargin(new Insets(10, 10, 10, 10));
-        textArea.setBackground(new Color(250, 250, 250));
-        
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        helpDialog.add(scrollPane, BorderLayout.CENTER);
-        
-        JButton closeButton = new JButton("Close");
-        closeButton.addActionListener(e -> helpDialog.dispose());
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        buttonPanel.add(closeButton);
-        helpDialog.add(buttonPanel, BorderLayout.SOUTH);
-        
-        helpDialog.setSize(500, 500);
-        helpDialog.setLocationRelativeTo(this);
-        helpDialog.setVisible(true);
-    }
-
-    private JButton createStyledButton(String text, Color backgroundColor) {
-        JButton button = new JButton(text);
-        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
-        button.setBackground(backgroundColor);
-        button.setForeground(Color.BLACK);
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
-            BorderFactory.createEmptyBorder(8, 15, 8, 15)
-        ));
-
-        // Add hover effect
-        button.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                button.setBackground(backgroundColor.brighter());
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                button.setBackground(backgroundColor);
-            }
-        });
-
-        return button;
-    }
-} 
+}

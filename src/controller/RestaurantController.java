@@ -19,11 +19,12 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import javax.swing.JOptionPane;
 import model.Ingredient;
 import model.IngredientBatch;
 import model.Dish;
-import java.util.Map;
+import java.util.Date;
 
 public class RestaurantController {
     private final Connection connection;
