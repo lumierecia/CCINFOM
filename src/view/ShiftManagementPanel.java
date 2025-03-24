@@ -92,6 +92,19 @@ public class ShiftManagementPanel extends JPanel {
         shiftsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         shiftsTable.getTableHeader().setReorderingAllowed(false);
         
+        // Add selection listener to enable/disable buttons
+        shiftsTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                boolean hasSelection = shiftsTable.getSelectedRow() != -1;
+                removeButton.setEnabled(hasSelection);
+                swapShiftButton.setEnabled(hasSelection);
+            }
+        });
+        
+        // Set initial button states
+        removeButton.setEnabled(false);
+        swapShiftButton.setEnabled(false);
+        
         // Set column widths
         shiftsTable.getColumnModel().getColumn(0).setPreferredWidth(150); // Name
         shiftsTable.getColumnModel().getColumn(1).setPreferredWidth(100); // Role
@@ -164,11 +177,6 @@ public class ShiftManagementPanel extends JPanel {
                 status
             });
         }
-        
-        // Update button states
-        boolean hasSelection = shiftsTable.getSelectedRow() != -1;
-        removeButton.setEnabled(hasSelection);
-        swapShiftButton.setEnabled(hasSelection);
     }
 
     private String[] getShiftTimeRange(String shiftType) {
