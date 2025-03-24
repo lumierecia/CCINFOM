@@ -352,6 +352,28 @@ public class EmployeeDAO {
         }
     }
 
+    public Employee getEmployeeByUserId(int userId) throws SQLException {
+        String query = "SELECT e.* FROM Employees e " +
+                      "JOIN UserCredentials uc ON e.employee_id = uc.employee_id " +
+                      "WHERE uc.user_id = ? AND e.is_deleted = FALSE";
+
+        try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                Employee employee = new Employee();
+                employee.setEmployeeId(rs.getInt("employee_id"));
+                employee.setFirstName(rs.getString("first_name"));
+                employee.setLastName(rs.getString("last_name"));
+                employee.setRoleId(rs.getInt("role_id"));
+                employee.setTimeShiftId(rs.getInt("time_shiftid"));
+                return employee;
+            }
+        }
+        return null;
+    }
+
     private Employee mapResultSetToEmployee(ResultSet rs) throws SQLException {
         Employee emp = new Employee(
             rs.getInt("employee_id"),

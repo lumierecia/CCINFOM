@@ -2,6 +2,7 @@ package view;
 
 import controller.RestaurantController;
 import model.Customer;
+import util.StyledComponents;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -32,11 +33,11 @@ public class CustomerPanel extends JPanel {
     private void initComponents() {
         // Create toolbar
         JPanel toolBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        addButton = createStyledButton("Add Customer", new Color(40, 167, 69));
-        editButton = createStyledButton("Edit Customer", new Color(255, 193, 7));
-        deleteButton = createStyledButton("Delete Customer", new Color(220, 53, 69));
-        viewOrdersButton = createStyledButton("View Orders", new Color(70, 130, 180));
-        refreshButton = createStyledButton("Refresh", new Color(108, 117, 125));
+        addButton = StyledComponents.createStyledButton("Add Customer", new Color(40, 167, 69));
+        editButton = StyledComponents.createStyledButton("Edit Customer", new Color(255, 193, 7));
+        deleteButton = StyledComponents.createStyledButton("Delete Customer", new Color(220, 53, 69));
+        viewOrdersButton = StyledComponents.createStyledButton("View Orders", new Color(70, 130, 180));
+        refreshButton = StyledComponents.createStyledButton("Refresh", new Color(108, 117, 125));
 
         toolBar.add(addButton);
         toolBar.add(editButton);
@@ -45,8 +46,7 @@ public class CustomerPanel extends JPanel {
         toolBar.add(refreshButton);
 
         // Create help button
-        helpButton = new JButton("Help");
-        helpButton.setIcon(new ImageIcon(getClass().getResource("/icons/help.png")));
+        helpButton = StyledComponents.createStyledButton("Help", new Color(108, 117, 125));
         helpButton.addActionListener(e -> showHelp());
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         topPanel.add(helpButton);
@@ -302,34 +302,33 @@ public class CustomerPanel extends JPanel {
     }
 
     private void showHelp() {
-        HelpDialog helpDialog = new HelpDialog(SwingUtilities.getWindowAncestor(this), "Customers");
-        helpDialog.setVisible(true);
-    }
-
-    private JButton createStyledButton(String text, Color backgroundColor) {
-        JButton button = new JButton(text);
-        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
-        button.setBackground(backgroundColor);
-        button.setForeground(Color.BLACK);
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
-            BorderFactory.createEmptyBorder(8, 15, 8, 15)
-        ));
-
-        // Add hover effect
-        button.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                button.setBackground(backgroundColor.brighter());
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                button.setBackground(backgroundColor);
-            }
-        });
-
-        return button;
+        String helpText = """
+            Customer Management Help:
+            
+            1. Adding Customers:
+               • Click "Add Customer" to create new customer
+               • Fill in all required fields
+               • Click "Add" to save
+            
+            2. Managing Customers:
+               • Select a customer to edit or delete
+               • Click "Edit Customer" to modify details
+               • Click "Delete Customer" to remove
+            
+            3. Viewing Orders:
+               • Select a customer
+               • Click "View Orders" to see order history
+               • Orders show date, total, and status
+            
+            4. Additional Features:
+               • Use "Refresh" to update the list
+               • Search and filter options available
+               • Customer details are saved automatically
+            """;
+        
+        JOptionPane.showMessageDialog(this,
+            helpText,
+            "Customer Management Help",
+            JOptionPane.INFORMATION_MESSAGE);
     }
 } 

@@ -87,19 +87,19 @@ public class LoginView extends JFrame {
         try {
             UserCredentials user = loginController.authenticateUser(username, password);
             if (user != null) {
-                JOptionPane.showMessageDialog(this, "Login successful!");
-                this.dispose(); // Close login window
+                // Check if user has appropriate role (Manager, Waiter, Chef, or Cashier)
+                if (user.getRoleId() >= 1 && user.getRoleId() <= 5) {
+                    JOptionPane.showMessageDialog(this, "Login successful!");
+                    this.dispose(); // Close login window
 
-                // Open appropriate view based on role
-                SwingUtilities.invokeLater(() -> {
-                    if (user.getRoleId() == 4) { // Manager
-                        new EmployeeView().setVisible(true);
-                    } else if (user.getRoleId() == 1 || user.getRoleId() == 2) { // Waiter or Chef
-                        new OrderView().setVisible(true);
-                    } else {
-                        JOptionPane.showMessageDialog(null, "Access denied. Insufficient permissions.");
-                    }
-                });
+                    // Open main application window
+                    SwingUtilities.invokeLater(() -> {
+                        MainFrame mainFrame = new MainFrame();
+                        mainFrame.setVisible(true);
+                    });
+                } else {
+                    JOptionPane.showMessageDialog(this, "Access denied. Insufficient permissions.");
+                }
             } else {
                 JOptionPane.showMessageDialog(this, "Invalid username or password!");
             }

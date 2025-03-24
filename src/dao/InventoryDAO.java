@@ -206,6 +206,34 @@ public class InventoryDAO {
         return items;
     }
 
+    public List<Inventory> getLowStockItems(int threshold) throws SQLException {
+        List<Inventory> items = new ArrayList<>();
+        String query = """
+            SELECT i.*, c.category_name,
+                   CASE 
+                       WHEN i.quantity = 0 THEN 'Unavailable'
+                       WHEN i.quantity <= ? THEN 'Low Stock'
+                       ELSE 'Available'
+                   END as status
+            FROM InventoryItems i 
+            JOIN Categories c ON i.category_id = c.category_id 
+            WHERE i.is_deleted = FALSE
+            AND i.quantity <= ?
+            ORDER BY i.quantity ASC
+        """;
+        
+        try (PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setInt(1, threshold);
+            stmt.setInt(2, threshold);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    items.add(createInventoryFromResultSet(rs));
+                }
+            }
+        }
+        return items;
+    }
+
     private Inventory createInventoryFromResultSet(ResultSet rs) throws SQLException {
         Inventory item = new Inventory(
             rs.getInt("product_id"),

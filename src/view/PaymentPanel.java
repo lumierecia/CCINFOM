@@ -2,6 +2,7 @@ package view;
 
 import controller.RestaurantController;
 import model.*;
+import util.StyledComponents;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.event.DocumentListener;
@@ -23,33 +24,6 @@ public class PaymentPanel extends JPanel {
         loadUnpaidOrders();
     }
 
-    private JButton createStyledButton(String text, Color backgroundColor) {
-        JButton button = new JButton(text);
-        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
-        button.setBackground(backgroundColor);
-        button.setForeground(Color.BLACK);
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
-            BorderFactory.createEmptyBorder(8, 15, 8, 15)
-        ));
-
-        // Add hover effect
-        button.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                button.setBackground(backgroundColor.brighter());
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                button.setBackground(backgroundColor);
-            }
-        });
-
-        return button;
-    }
-
     private void initComponents() {
         setLayout(new BorderLayout(10, 10));
         
@@ -57,13 +31,13 @@ public class PaymentPanel extends JPanel {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
         buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        JButton processButton = createStyledButton("Process Payment", new Color(40, 167, 69));
+        JButton processButton = StyledComponents.createStyledButton("Process Payment", new Color(40, 167, 69));
         processButton.addActionListener(e -> processPayment());
         
-        JButton refreshButton = createStyledButton("Refresh", new Color(70, 130, 180));
+        JButton refreshButton = StyledComponents.createStyledButton("Refresh", new Color(70, 130, 180));
         refreshButton.addActionListener(e -> loadUnpaidOrders());
         
-        JButton helpButton = createStyledButton("Help", new Color(108, 117, 125));
+        JButton helpButton = StyledComponents.createStyledButton("Help", new Color(108, 117, 125));
         helpButton.addActionListener(e -> showHelpDialog());
         
         buttonPanel.add(processButton);
@@ -380,7 +354,30 @@ public class PaymentPanel extends JPanel {
     }
 
     private void showHelpDialog() {
-        HelpDialog helpDialog = new HelpDialog(SwingUtilities.getWindowAncestor(this), "Payments");
-        helpDialog.setVisible(true);
+        String helpText = """
+            Payment Processing Help:
+            
+            1. Viewing Orders:
+               • Unpaid orders are listed in the table
+               • Double-click an order to view details
+               • Click "Refresh" to update the list
+            
+            2. Processing Payment:
+               • Select an order from the table
+               • Click "Process Payment"
+               • Choose payment method
+               • Enter amount received
+               • Confirm the transaction
+            
+            3. Additional Features:
+               • Order details show items and totals
+               • Payment status is updated automatically
+               • Receipt is generated after payment
+            """;
+        
+        JOptionPane.showMessageDialog(this,
+            helpText,
+            "Payment Processing Help",
+            JOptionPane.INFORMATION_MESSAGE);
     }
 } 

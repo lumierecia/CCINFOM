@@ -2,6 +2,7 @@ package view;
 
 import controller.RestaurantController;
 import model.*;
+import util.StyledComponents;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -84,19 +85,19 @@ public class OrderPanel extends JPanel {
         quantityPanel.add(quantityHelpBtn);
 
         // Create action buttons with consistent styling
-        JButton addButton = createStyledButton("Add to Order", new Color(40, 167, 69));
+        JButton addButton = StyledComponents.createStyledButton("Add to Order", new Color(40, 167, 69));
         addButton.addActionListener(e -> addItemToOrder());
 
-        JButton removeButton = createStyledButton("Remove Item", new Color(220, 53, 69));
+        JButton removeButton = StyledComponents.createStyledButton("Remove Item", new Color(220, 53, 69));
         removeButton.addActionListener(e -> removeSelectedItem());
 
-        JButton clearButton = createStyledButton("Clear All", new Color(255, 193, 7));
+        JButton clearButton = StyledComponents.createStyledButton("Clear All", new Color(255, 193, 7));
         clearButton.addActionListener(e -> clearOrder());
 
-        JButton placeOrderButton = createStyledButton("Place Order", new Color(70, 130, 180));
+        JButton placeOrderButton = StyledComponents.createStyledButton("Place Order", new Color(70, 130, 180));
         placeOrderButton.addActionListener(e -> placeOrder());
 
-        JButton helpButton = createStyledButton("Help", new Color(108, 117, 125));
+        JButton helpButton = StyledComponents.createStyledButton("Help", new Color(108, 117, 125));
         helpButton.addActionListener(e -> showHelp());
 
         // Add buttons to panel
@@ -466,58 +467,40 @@ public class OrderPanel extends JPanel {
     }
 
     private JButton createHelpButton(String helpText) {
-        JButton helpBtn = new JButton("?");
-        helpBtn.setFont(new Font(helpBtn.getFont().getName(), Font.BOLD, 10));
-        helpBtn.setMargin(new Insets(1, 4, 1, 4));
-        helpBtn.setToolTipText("Click for help");
-        helpBtn.addActionListener(e -> {
-            JTextArea textArea = new JTextArea(helpText);
-            textArea.setEditable(false);
-            textArea.setLineWrap(true);
-            textArea.setWrapStyleWord(true);
-            textArea.setMargin(new Insets(10, 10, 10, 10));
-            textArea.setBackground(new Color(252, 252, 252));
-            
-            JScrollPane scrollPane = new JScrollPane(textArea);
-            scrollPane.setPreferredSize(new Dimension(300, 200));
-            
-            JOptionPane.showMessageDialog(this,
-                scrollPane,
-                "Help",
-                JOptionPane.INFORMATION_MESSAGE);
-        });
-        return helpBtn;
-    }
-
-    private JButton createStyledButton(String text, Color backgroundColor) {
-        JButton button = new JButton(text);
-        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
-        button.setBackground(backgroundColor);
-        button.setForeground(Color.BLACK);
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
-            BorderFactory.createEmptyBorder(8, 15, 8, 15)
-        ));
-
-        // Add hover effect
-        button.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                button.setBackground(backgroundColor.brighter());
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                button.setBackground(backgroundColor);
-            }
-        });
-
-        return button;
+        JButton helpButton = StyledComponents.createStyledButton("?", new Color(108, 117, 125));
+        helpButton.setToolTipText(helpText);
+        return helpButton;
     }
 
     private void showHelp() {
-        HelpDialog helpDialog = new HelpDialog(SwingUtilities.getWindowAncestor(this), "Orders");
-        helpDialog.setVisible(true);
+        String helpText = """
+            Order Management Help:
+            
+            1. Adding Items:
+               • Select a category to filter menu items
+               • Choose a product from the list
+               • Set the quantity
+               • Click "Add to Order"
+            
+            2. Managing Order:
+               • View items in the table below
+               • Select an item and click "Remove Item" to delete
+               • Click "Clear All" to start over
+            
+            3. Placing Order:
+               • Review your order in the table
+               • Check the total amount
+               • Click "Place Order" when ready
+            
+            4. Additional Features:
+               • Hover over buttons for tooltips
+               • Click the "?" buttons for specific help
+               • Ingredient details are shown before adding items
+            """;
+        
+        JOptionPane.showMessageDialog(this,
+            helpText,
+            "Order Management Help",
+            JOptionPane.INFORMATION_MESSAGE);
     }
 } 

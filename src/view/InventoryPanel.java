@@ -3,6 +3,7 @@ package view;
 import controller.RestaurantController;
 import model.Inventory;
 import util.DatabaseErrorHandler;
+import util.StyledComponents;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -25,8 +26,7 @@ public class InventoryPanel extends JPanel {
         setLayout(new BorderLayout());
 
         // Create help button
-        helpButton = new JButton("Help");
-        helpButton.setIcon(new ImageIcon(getClass().getResource("/icons/help.png")));
+        helpButton = StyledComponents.createStyledButton("Help", new Color(108, 117, 125));
         helpButton.addActionListener(e -> showHelp());
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         topPanel.add(helpButton);
@@ -96,7 +96,7 @@ public class InventoryPanel extends JPanel {
         otherControlsPanel.add(searchField);
         
         // Add refresh button
-        JButton refreshButton = createStyledButton("Refresh", new Color(70, 130, 180));
+        JButton refreshButton = StyledComponents.createStyledButton("Refresh", new Color(70, 130, 180));
         refreshButton.addActionListener(e -> refreshTable());
         otherControlsPanel.add(refreshButton);
         
@@ -147,33 +147,6 @@ public class InventoryPanel extends JPanel {
                 button.setForeground(Color.BLACK);
             }
         });
-    }
-
-    private JButton createStyledButton(String text, Color backgroundColor) {
-        JButton button = new JButton(text);
-        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
-        button.setBackground(backgroundColor);
-        button.setForeground(Color.BLACK);
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(backgroundColor.darker(), 1),
-            BorderFactory.createEmptyBorder(5, 10, 5, 10)
-        ));
-
-        // Add hover effect
-        button.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseEntered(java.awt.event.MouseEvent e) {
-                button.setBackground(backgroundColor.brighter());
-            }
-
-            @Override
-            public void mouseExited(java.awt.event.MouseEvent e) {
-                button.setBackground(backgroundColor);
-            }
-        });
-
-        return button;
     }
 
     private void refreshTable() {

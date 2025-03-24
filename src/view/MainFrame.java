@@ -7,6 +7,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import controller.RestaurantController;
 import view.panels.*;
+import java.sql.SQLException;
 
 public class MainFrame extends JFrame {
     private JTabbedPane tabbedPane;
@@ -23,8 +24,13 @@ public class MainFrame extends JFrame {
         setSize(1200, 800);
         setLocationRelativeTo(null);
 
-        // Initialize controller
-        controller = new RestaurantController();
+        try {
+            // Initialize controller
+            controller = new RestaurantController();
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Error initializing system: " + e.getMessage());
+            System.exit(1);
+        }
 
         // Initialize layout
         cardLayout = new CardLayout();
@@ -97,8 +103,8 @@ public class MainFrame extends JFrame {
         }
 
         SwingUtilities.invokeLater(() -> {
-            MainFrame frame = new MainFrame();
-            frame.setVisible(true);
+            LoginView loginView = new LoginView();
+            loginView.setVisible(true);
         });
     }
 } 

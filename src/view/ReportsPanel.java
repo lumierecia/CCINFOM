@@ -1,207 +1,153 @@
 package view;
 
+import controller.ReportGenerator;
 import controller.RestaurantController;
-import model.Order;
-import model.OrderItem;
-import model.Customer;
-import model.Employee;
-import model.Inventory;
+
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.Date;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.ArrayList;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 
 public class ReportsPanel extends JPanel {
-    private final RestaurantController controller;
+    private final ReportGenerator reportGenerator;
+    private final JTextArea reportArea;
     private final JComboBox<String> reportTypeCombo;
-    private final JTable reportTable;
-    private DefaultTableModel tableModel;
-    private final JPanel reportPanel;
-    private final JTextField dayField;
-    private final JTextField monthField;
-    private final JTextField yearField;
-    private final JLabel summaryLabel;
+    private final JSpinner startDateSpinner;
+    private final JSpinner endDateSpinner;
+    private final SimpleDateFormat dateFormat;
 
-    public ReportsPanel(RestaurantController controller) {
-        this.controller = controller;
-        setLayout(new BorderLayout());
+    public ReportsPanel(RestaurantController controller) throws Exception {
+        this.reportGenerator = new ReportGenerator(controller);
+        this.dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        
+        setLayout(new BorderLayout(10, 10));
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // Create control panel
-        JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         
-        // Report type selector
-        String[] reportTypes = {
+        // Report type selection
+        reportTypeCombo = new JComboBox<>(new String[]{
             "Sales Report",
-            "Customer Orders Report",
-            "Employee Shifts Report",
+            "Employee Performance Report",
+            "Customer Insights Report",
             "Profit Margin Report"
-        };
-        reportTypeCombo = new JComboBox<>(reportTypes);
-        
-        // Date input fields
-        dayField = new JTextField(2);
-        monthField = new JTextField(2);
-        yearField = new JTextField(4);
-        
-        JButton generateButton = new JButton("Generate Report");
-        
+        });
         controlPanel.add(new JLabel("Report Type:"));
         controlPanel.add(reportTypeCombo);
-        controlPanel.add(new JLabel("Day (0 to skip):"));
-        controlPanel.add(dayField);
-        controlPanel.add(new JLabel("Month (0 to skip):"));
-        controlPanel.add(monthField);
-        controlPanel.add(new JLabel("Year (0 to skip):"));
-        controlPanel.add(yearField);
+
+        // Date range selection
+        Calendar calendar = Calendar.getInstance();
+        startDateSpinner = new JSpinner(new SpinnerDateModel(calendar.getTime(), null, null, Calendar.DAY_OF_MONTH));
+        endDateSpinner = new JSpinner(new SpinnerDateModel(calendar.getTime(), null, null, Calendar.DAY_OF_MONTH));
+        
+        JSpinner.DateEditor startDateEditor = new JSpinner.DateEditor(startDateSpinner, "yyyy-MM-dd");
+        JSpinner.DateEditor endDateEditor = new JSpinner.DateEditor(endDateSpinner, "yyyy-MM-dd");
+        startDateSpinner.setEditor(startDateEditor);
+        endDateSpinner.setEditor(endDateEditor);
+
+        controlPanel.add(new JLabel("Start Date:"));
+        controlPanel.add(startDateSpinner);
+        controlPanel.add(new JLabel("End Date:"));
+        controlPanel.add(endDateSpinner);
+
+        // Generate button
+        JButton generateButton = new JButton("Generate Report");
+        generateButton.setBackground(new Color(40, 167, 69));
+        generateButton.setForeground(Color.WHITE);
+        generateButton.setFocusPainted(false);
+        generateButton.setBorderPainted(false);
+        generateButton.setOpaque(true);
+        generateButton.addActionListener(e -> generateReport());
         controlPanel.add(generateButton);
 
-        // Create report panel
-        reportPanel = new JPanel(new BorderLayout());
-        
-        // Create table
-        reportTable = new JTable();
-        reportTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-        
-        // Create summary label
-        summaryLabel = new JLabel();
-        summaryLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-        
-        // Add components to main panel
+        // Export button
+        JButton exportButton = new JButton("Export Report");
+        exportButton.setBackground(new Color(23, 162, 184));
+        exportButton.setForeground(Color.WHITE);
+        exportButton.setFocusPainted(false);
+        exportButton.setBorderPainted(false);
+        exportButton.setOpaque(true);
+        exportButton.addActionListener(e -> exportReport());
+        controlPanel.add(exportButton);
+
+        // Report display area
+        reportArea = new JTextArea();
+        reportArea.setEditable(false);
+        reportArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        JScrollPane scrollPane = new JScrollPane(reportArea);
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Report Output"));
+
+        // Add components to panel
         add(controlPanel, BorderLayout.NORTH);
-        add(reportPanel, BorderLayout.CENTER);
-        add(summaryLabel, BorderLayout.SOUTH);
-
-        // Add listeners
-        generateButton.addActionListener(e -> generateReport());
-        reportTypeCombo.addActionListener(e -> updateReportPanel());
-
-        // Set default values
-        dayField.setText("0");
-        monthField.setText("0");
-        yearField.setText("0");
-
-        // Initialize the report panel
-        updateReportPanel();
-    }
-
-    private void updateReportPanel() {
-        reportPanel.removeAll();
-        String selectedReport = (String) reportTypeCombo.getSelectedItem();
-        
-        switch (selectedReport) {
-            case "Sales Report" -> setupSalesReport();
-            case "Customer Orders Report" -> setupCustomerOrdersReport();
-            case "Employee Shifts Report" -> setupEmployeeShiftsReport();
-            case "Profit Margin Report" -> setupProfitMarginReport();
-        }
-        
-        reportPanel.revalidate();
-        reportPanel.repaint();
-    }
-
-    private String getDatePattern() {
-        try {
-            int day = Integer.parseInt(dayField.getText().trim());
-            int month = Integer.parseInt(monthField.getText().trim());
-            int year = Integer.parseInt(yearField.getText().trim());
-
-            if (day < 0 || month < 0 || year < 0) {
-                throw new IllegalArgumentException("Values must be non-negative");
-            }
-
-            if (month > 12) {
-                throw new IllegalArgumentException("Month must be between 0 and 12");
-            }
-
-            if (day > 31) {
-                throw new IllegalArgumentException("Day must be between 0 and 31");
-            }
-
-            String yearStr = (year == 0) ? "%" : String.format("%04d", year);
-            String monthStr = (month == 0) ? "%" : String.format("%02d", month);
-            String dayStr = (day == 0) ? "%" : String.format("%02d", day);
-
-            return String.format("%s-%s-%s", yearStr, monthStr, dayStr);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Please enter valid numbers");
-        }
-    }
-
-    private void setupSalesReport() {
-        String[] columns = {"Sales Date", "Total Sales", "Average Sales", "Top Product", "Units Sold"};
-        tableModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        reportTable.setModel(tableModel);
-        reportPanel.add(new JScrollPane(reportTable), BorderLayout.CENTER);
-    }
-
-    private void setupCustomerOrdersReport() {
-        String[] columns = {"Total Orders", "Total Amount Spent", "Most Bought Product", "Most Bought Quantity"};
-        tableModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        reportTable.setModel(tableModel);
-        reportPanel.add(new JScrollPane(reportTable), BorderLayout.CENTER);
-    }
-
-    private void setupEmployeeShiftsReport() {
-        String[] columns = {"First Name", "Last Name", "Total Shifts", "Total Hours"};
-        tableModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        reportTable.setModel(tableModel);
-        reportPanel.add(new JScrollPane(reportTable), BorderLayout.CENTER);
-    }
-
-    private void setupProfitMarginReport() {
-        String[] columns = {"Order Date", "Total Orders", "Total Quantity", "Revenue", "Cost", "Profit"};
-        tableModel = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        reportTable.setModel(tableModel);
-        reportPanel.add(new JScrollPane(reportTable), BorderLayout.CENTER);
+        add(scrollPane, BorderLayout.CENTER);
     }
 
     private void generateReport() {
         try {
-            String datePattern = getDatePattern();
-            String selectedReport = (String) reportTypeCombo.getSelectedItem();
+            java.util.Date startDateUtil = (java.util.Date) startDateSpinner.getValue();
+            java.util.Date endDateUtil = (java.util.Date) endDateSpinner.getValue();
+            Date startDate = new Date(startDateUtil.getTime());
+            Date endDate = new Date(endDateUtil.getTime());
             
-            tableModel.setRowCount(0);
+            String report = switch (reportTypeCombo.getSelectedIndex()) {
+                case 0 -> reportGenerator.generateSalesReport(startDate, endDate);
+                case 1 -> reportGenerator.generateEmployeePerformanceReport(startDate, endDate);
+                case 2 -> reportGenerator.generateCustomerInsightsReport(startDate, endDate);
+                case 3 -> reportGenerator.generateProfitMarginReport(startDate, endDate);
+                default -> throw new IllegalStateException("Invalid report type selected");
+            };
             
-            switch (selectedReport) {
-                case "Sales Report" -> controller.generateSalesReport(datePattern, tableModel);
-                case "Customer Orders Report" -> controller.generateCustomerOrdersReport(datePattern, tableModel);
-                case "Employee Shifts Report" -> controller.generateEmployeeShiftsReport(datePattern, tableModel);
-                case "Profit Margin Report" -> controller.generateProfitMarginReport(datePattern, tableModel);
-            }
-        } catch (IllegalArgumentException e) {
-            JOptionPane.showMessageDialog(this, 
-                e.getMessage(), 
-                "Input Error", 
-                JOptionPane.ERROR_MESSAGE);
+            reportArea.setText(report);
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, 
-                "Error generating report: " + e.getMessage(), 
-                "Error", 
+            JOptionPane.showMessageDialog(this,
+                "Error generating report: " + e.getMessage(),
+                "Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void exportReport() {
+        if (reportArea.getText().isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                "Please generate a report first.",
+                "No Report to Export",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        try {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Export Report");
+            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+            
+            // Set default filename based on report type and date range
+            String defaultName = String.format("%s_%s_to_%s.txt",
+                reportTypeCombo.getSelectedItem().toString().replace(" ", "_"),
+                dateFormat.format(startDateSpinner.getValue()),
+                dateFormat.format(endDateSpinner.getValue()));
+            fileChooser.setSelectedFile(new java.io.File(defaultName));
+
+            if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                java.io.File file = fileChooser.getSelectedFile();
+                if (!file.getName().toLowerCase().endsWith(".txt")) {
+                    file = new java.io.File(file.getAbsolutePath() + ".txt");
+                }
+
+                try (java.io.PrintWriter writer = new java.io.PrintWriter(file)) {
+                    writer.write(reportArea.getText());
+                }
+
+                JOptionPane.showMessageDialog(this,
+                    "Report exported successfully!",
+                    "Export Complete",
+                    JOptionPane.INFORMATION_MESSAGE);
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this,
+                "Error exporting report: " + e.getMessage(),
+                "Error",
                 JOptionPane.ERROR_MESSAGE);
         }
     }

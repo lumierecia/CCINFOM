@@ -20,6 +20,7 @@ public class RestaurantController {
     private final ShiftManager shiftManager;
     private final ReportManager reportManager;
     private final TableDAO tableDAO;
+    private final PaymentDAO paymentDAO;
 
     public RestaurantController() {
         try {
@@ -36,6 +37,7 @@ public class RestaurantController {
             this.shiftManager = new ShiftManager(this);
             this.reportManager = new ReportManager(this);
             this.tableDAO = new TableDAO();
+            this.paymentDAO = new PaymentDAO();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize database connection", e);
         }
@@ -1101,5 +1103,47 @@ public class RestaurantController {
             }
         }
         return rewards;
+    }
+
+    // DAO Getters
+    public OrderDAO getOrderDAO() {
+        return orderDAO;
+    }
+
+    public EmployeeDAO getEmployeeDAO() {
+        return employeeDAO;
+    }
+
+    public CustomerDAO getCustomerDAO() {
+        return customerDAO;
+    }
+
+    public PaymentDAO getPaymentDAO() {
+        return paymentDAO;
+    }
+
+    public DishDAO getDishDAO() {
+        return dishDAO;
+    }
+
+    public IngredientDAO getIngredientDAO() {
+        return ingredientDAO;
+    }
+
+    public double calculateOrderTotal(int orderId) throws SQLException {
+        Order order = orderDAO.getOrderById(orderId);
+        if (order == null) {
+            throw new SQLException("Order not found");
+        }
+
+        double total = 0.0;
+        for (OrderItem item : order.getItems()) {
+            total += item.getQuantity() * item.getPriceAtTime();
+        }
+        return total;
+    }
+
+    public List<Inventory> getLowStockItems(int threshold) throws SQLException {
+        return inventoryDAO.getLowStockItems(threshold);
     }
 } 
