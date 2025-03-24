@@ -923,9 +923,7 @@ public class RestaurantController {
     public Map<Integer, Double> getDishIngredients(int dishId) {
         return dishDAO.getDishIngredients(dishId);
     }
-<<<<<<< Updated upstream
-} 
-=======
+
 
     public boolean swapShifts(int employee1Id, int employee2Id) {
         String query = "UPDATE Employees e1, Employees e2 " +
@@ -947,4 +945,3 @@ public class RestaurantController {
         }
     }
 } 
->>>>>>> Stashed changes
