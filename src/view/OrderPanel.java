@@ -228,11 +228,13 @@ public class OrderPanel extends JPanel {
         itemsModel.addRow(row);
 
         // Add to order items list
-        OrderItem newItem = new OrderItem();
-        newItem.setDishId(selectedDish.getDishId());
-        newItem.setDishName(selectedDish.getName());
-        newItem.setQuantity(quantity);
-        newItem.setPriceAtTime(selectedDish.getSellingPrice());
+        OrderItem newItem = new OrderItem(
+            0, // Temporary orderId, will be set when order is saved <------
+            selectedDish.getDishId(),
+            quantity,
+            selectedDish.getSellingPrice(),
+            selectedDish.getName()
+        );
         orderItems.add(newItem);
 
         updateTotal();

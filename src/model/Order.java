@@ -17,6 +17,9 @@ public class Order {
     private String paymentMethod;
     private List<OrderItem> items;
     private List<Integer> assignedEmployees;
+    private int tableId;
+    private boolean isDeleted;
+    private Table table;
 
     public Order() {
         this.items = new ArrayList<>();
@@ -50,6 +53,23 @@ public class Order {
         this.paymentStatus = paymentStatus;
         this.totalAmount = totalAmount;
         this.paymentMethod = paymentMethod;
+        this.items = new ArrayList<>();
+        this.assignedEmployees = new ArrayList<>();
+    }
+
+    public Order(int orderId, int customerId, String orderType, String orderStatus, 
+                Timestamp orderDatetime, double totalAmount, String paymentMethod, 
+                String paymentStatus, int tableId, boolean isDeleted) {
+        this.orderId = orderId;
+        this.customerId = customerId;
+        this.orderType = orderType;
+        this.orderStatus = orderStatus;
+        this.orderDateTime = orderDatetime;
+        this.totalAmount = totalAmount;
+        this.paymentMethod = paymentMethod;
+        this.paymentStatus = paymentStatus;
+        this.tableId = tableId;
+        this.isDeleted = isDeleted;
         this.items = new ArrayList<>();
         this.assignedEmployees = new ArrayList<>();
     }
@@ -157,5 +177,46 @@ public class Order {
 
     public void removeAssignedEmployee(int employeeId) {
         assignedEmployees.remove(Integer.valueOf(employeeId));
+    }
+
+    public int getTableId() {
+        return tableId;
+    }
+
+    public void setTableId(int tableId) {
+        this.tableId = tableId;
+    }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
+
+    public Table getTable() {
+        return table;
+    }
+
+    public void setTable(Table table) {
+        this.table = table;
+    }
+
+    @Override
+    public String toString() {
+        return "Order{" +
+                "orderId=" + orderId +
+                ", customerId=" + customerId +
+                ", customerName='" + customerName + '\'' +
+                ", orderDateTime=" + orderDateTime +
+                ", orderType='" + orderType + '\'' +
+                ", orderStatus='" + orderStatus + '\'' +
+                ", paymentStatus='" + paymentStatus + '\'' +
+                ", totalAmount=" + totalAmount +
+                ", paymentMethod='" + paymentMethod + '\'' +
+                ", tableId=" + tableId +
+                ", isDeleted=" + isDeleted +
+                '}';
     }
 } 
