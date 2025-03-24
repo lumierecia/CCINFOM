@@ -14,6 +14,7 @@ public class Employee {
     private int timeShiftId;
     private String roleName;
     private int roleId;
+    private boolean isDeleted;
 
     public Employee() {
     }
@@ -49,6 +50,7 @@ public class Employee {
     public int getTimeShiftId() { return timeShiftId; }
     public String getRoleName() { return roleName; }
     public int getRoleId() { return roleId; }
+    public boolean isDeleted() { return isDeleted; }
 
     // Setters
     public void setEmployeeId(int employeeId) { this.employeeId = employeeId; }
@@ -62,9 +64,10 @@ public class Employee {
     public void setTimeShiftId(int timeShiftId) { this.timeShiftId = timeShiftId; }
     public void setRoleName(String roleName) { this.roleName = roleName; }
     public void setRoleId(int roleId) { this.roleId = roleId; }
+    public void setDeleted(boolean isDeleted) { this.isDeleted = isDeleted; }
 
     @Override
     public String toString() {
         return firstName + " " + lastName;
     }
-} 
+}

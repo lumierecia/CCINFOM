@@ -18,6 +18,7 @@ import util.DatabaseConnection;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.swing.JOptionPane;
 import model.Ingredient;
 import model.IngredientBatch;
@@ -431,6 +432,10 @@ public class RestaurantController {
 
     public String getCurrentShift(int employeeId) {
         return employeeDAO.getCurrentShift(employeeId);
+    }
+
+    public boolean swapEmployeeShifts(int employee1Id, int employee2Id) {
+        return employeeDAO.swapEmployeeShifts(employee1Id, employee2Id);
     }
 
     public List<Supplier> getAllSuppliers() {

@@ -7,8 +7,6 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.List;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
 public class ShiftManagementPanel extends JPanel {
     private final RestaurantController controller;
@@ -143,34 +141,28 @@ public class ShiftManagementPanel extends JPanel {
         String filter = (String) filterCombo.getSelectedItem();
         
         for (Employee employee : employees) {
-            if (employee == null) continue;
+            if (employee.isDeleted()) continue;
             
             String shiftType = employee.getShiftType();
-            String role = employee.getRole() != null ? employee.getRole() : "Unassigned";
+            if (shiftType == null) shiftType = "Unassigned";
             
             // Apply filter
-            if (filter != null && !filter.equals("All Shifts")) {
-                if (filter.equals("Unassigned")) {
-                    if (shiftType != null) continue;
-                } else {
-                    if (shiftType == null || !shiftType.equalsIgnoreCase(filter.replace(" Shift", ""))) continue;
-                }
+            if (!"All Shifts".equals(filter)) {
+                if ("Unassigned".equals(filter) && !"Unassigned".equals(shiftType)) continue;
+                if (!"Unassigned".equals(filter) && !filter.equals(shiftType + " Shift")) continue;
             }
             
-            // Format times for display
-            String startTime = employee.getShiftStart() != null ? employee.getShiftStart().toString() : "-";
-            String endTime = employee.getShiftEnd() != null ? employee.getShiftEnd().toString() : "-";
-            String status = shiftType != null ? "Active" : "Not Assigned";
+            String[] timeRange = getShiftTimeRange(shiftType);
+            String status = getShiftStatus(employee);
             
-            Object[] row = {
+            tableModel.addRow(new Object[]{
                 employee.getFirstName() + " " + employee.getLastName(),
-                role,
-                shiftType != null ? shiftType : "Unassigned",
-                startTime,
-                endTime,
+                employee.getRoleName(),
+                shiftType,
+                timeRange[0],
+                timeRange[1],
                 status
-            };
-            tableModel.addRow(row);
+            });
         }
         
         // Update button states
@@ -179,25 +171,57 @@ public class ShiftManagementPanel extends JPanel {
         swapShiftButton.setEnabled(hasSelection);
     }
 
+    private String[] getShiftTimeRange(String shiftType) {
+        switch (shiftType) {
+            case "Morning":
+                return new String[]{"06:00 AM", "02:00 PM"};
+            case "Afternoon":
+                return new String[]{"02:00 PM", "10:00 PM"};
+            case "Night":
+                return new String[]{"10:00 PM", "06:00 AM"};
+            default:
+                return new String[]{"--:--", "--:--"};
+        }
+    }
+    
+    private String getShiftStatus(Employee employee) {
+        if (employee.getShiftType() == null) return "Unassigned";
+        
+        // Get count of employees in same shift
+        long shiftCount = controller.getAllEmployees().stream()
+            .filter(e -> !e.isDeleted() && 
+                   employee.getShiftType().equals(e.getShiftType()))
+            .count();
+            
+        return shiftCount > 5L ? "Overstaffed" : "Active";
+    }
+
     private void showAssignDialog() {
-        // Create dialog
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
             "Assign Shift", true);
         dialog.setLayout(new BorderLayout(10, 10));
+        dialog.setMinimumSize(new Dimension(400, 200));
         
-        // Create form panel
         JPanel formPanel = new JPanel(new GridBagLayout());
-        formPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridwidth = 1;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.insets = new Insets(5, 5, 5, 5);
         
-        // Employee selection
+        // Get unassigned employees
         List<Employee> unassignedEmployees = controller.getAllEmployees().stream()
-            .filter(e -> e.getShiftType() == null)
+            .filter(e -> !e.isDeleted() && e.getShiftType() == null)
             .toList();
+            
+        if (unassignedEmployees.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                "No unassigned employees available.",
+                "No Employees",
+                JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
         
+        // Employee selection
         JComboBox<Employee> employeeCombo = new JComboBox<>(
             unassignedEmployees.toArray(new Employee[0]));
         employeeCombo.setPreferredSize(new Dimension(200, 30));
@@ -265,6 +289,15 @@ public class ShiftManagementPanel extends JPanel {
         dialog.pack();
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
+    }
+
+    private int getTimeShiftId(String shiftType) {
+        return switch (shiftType) {
+            case "Morning" -> 1;
+            case "Afternoon" -> 2;
+            case "Night" -> 3;
+            default -> -1;
+        };
     }
 
     private void removeSelectedShift() {
@@ -393,15 +426,6 @@ public class ShiftManagementPanel extends JPanel {
         textArea.setBackground(new Color(245, 245, 245));
     }
 
-    private int getTimeShiftId(String shiftType) {
-        return switch (shiftType) {
-            case "Morning" -> 1;
-            case "Afternoon" -> 2;
-            case "Night" -> 3;
-            default -> -1;
-        };
-    }
-
     private void showSwapShiftDialog() {
         int selectedRow = shiftsTable.getSelectedRow();
         if (selectedRow == -1) {
@@ -477,7 +501,7 @@ public class ShiftManagementPanel extends JPanel {
         JButton swapButton = new JButton("Swap");
         JButton cancelButton = new JButton("Cancel");
 
-        swapButton.addActionListener(e -> {
+        swapButton.addActionListener(action -> {
             String targetName = ((String) employeeCombo.getSelectedItem()).split(" \\(")[0];
             String[] targetNameParts = targetName.split(" ");
             
@@ -494,24 +518,71 @@ public class ShiftManagementPanel extends JPanel {
                 .findFirst()
                 .orElse(null);
 
-            if (emp1 != null && emp2 != null) {
-                if (controller.swapShifts(emp1.getEmployeeId(), emp2.getEmployeeId())) {
+            if (emp1 == null || emp2 == null) {
+                JOptionPane.showMessageDialog(dialog,
+                    "Could not find one or both employees. Please check the names and try again.",
+                    "Employee Not Found",
+                    JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            // Validate both employees have shifts assigned
+            if (emp1.getShiftType() == null || emp2.getShiftType() == null) {
+                JOptionPane.showMessageDialog(dialog,
+                    "Both employees must have shifts assigned to swap.",
+                    "Invalid Swap",
+                    JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Validate employees are not the same
+            if (emp1.getEmployeeId() == emp2.getEmployeeId()) {
+                JOptionPane.showMessageDialog(dialog,
+                    "Cannot swap shifts with the same employee.",
+                    "Invalid Swap",
+                    JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Confirm swap with user
+            int confirm = JOptionPane.showConfirmDialog(dialog,
+                String.format("Are you sure you want to swap shifts?\n\n%s: %s Shift\n%s: %s Shift",
+                    emp1.getFirstName() + " " + emp1.getLastName(), emp1.getShiftType(),
+                    emp2.getFirstName() + " " + emp2.getLastName(), emp2.getShiftType()),
+                "Confirm Shift Swap",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+
+            if (confirm != JOptionPane.YES_OPTION) {
+                return;
+            }
+
+            try {
+                if (controller.swapEmployeeShifts(emp1.getEmployeeId(), emp2.getEmployeeId())) {
                     JOptionPane.showMessageDialog(dialog,
-                        "Shifts swapped successfully!",
+                        String.format("Successfully swapped shifts between:\n%s and %s",
+                            emp1.getFirstName() + " " + emp1.getLastName(),
+                            emp2.getFirstName() + " " + emp2.getLastName()),
                         "Success",
                         JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     loadShifts();
                 } else {
                     JOptionPane.showMessageDialog(dialog,
-                        "Failed to swap shifts. Please try again.",
-                        "Error",
+                        "Failed to swap shifts. The database operation was unsuccessful.",
+                        "Database Error",
                         JOptionPane.ERROR_MESSAGE);
                 }
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(dialog,
+                    "An error occurred while swapping shifts: " + e.getMessage(),
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+                e.printStackTrace();
             }
         });
 
-        cancelButton.addActionListener(e -> dialog.dispose());
+        cancelButton.addActionListener(event -> dialog.dispose());
 
         buttonPanel.add(swapButton);
         buttonPanel.add(cancelButton);
@@ -601,4 +672,4 @@ public class ShiftManagementPanel extends JPanel {
         HelpDialog helpDialog = new HelpDialog(SwingUtilities.getWindowAncestor(this), "Shift Management");
         helpDialog.setVisible(true);
     }
-} 
+}

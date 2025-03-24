@@ -352,6 +352,38 @@ public class EmployeeDAO {
         }
     }
 
+    public boolean swapEmployeeShifts(int employee1Id, int employee2Id) {
+        String query = """
+            UPDATE Employees AS e1
+            JOIN Employees AS e2
+            SET e1.time_shiftid = @temp := e1.time_shiftid,
+                e1.time_shiftid = e2.time_shiftid,
+                e2.time_shiftid = @temp
+            WHERE e1.employee_id = ? AND e2.employee_id = ?
+        """;
+
+        try (Connection conn = getConnection()) {
+            // Initialize @temp variable
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("SET @temp = NULL");
+            }
+
+            // Execute swap
+            try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+                pstmt.setInt(1, employee1Id);
+                pstmt.setInt(2, employee2Id);
+                return pstmt.executeUpdate() > 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Failed to swap shifts: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
     private Employee mapResultSetToEmployee(ResultSet rs) throws SQLException {
         Employee emp = new Employee(
             rs.getInt("employee_id"),
@@ -364,4 +396,4 @@ public class EmployeeDAO {
         emp.setShiftEnd(rs.getTime("time_end"));
         return emp;
     }
-} 
+}
