@@ -143,24 +143,40 @@ public class ShiftManagementPanel extends JPanel {
         String filter = (String) filterCombo.getSelectedItem();
         
         for (Employee employee : employees) {
+            if (employee == null) continue;
+            
             String shiftType = employee.getShiftType();
+            String role = employee.getRole() != null ? employee.getRole() : "Unassigned";
             
             // Apply filter
             if (filter != null && !filter.equals("All Shifts")) {
-                if (filter.equals("Unassigned") && shiftType != null) continue;
-                if (!filter.equals("Unassigned") && (shiftType == null || !filter.startsWith(shiftType))) continue;
+                if (filter.equals("Unassigned")) {
+                    if (shiftType != null) continue;
+                } else {
+                    if (shiftType == null || !shiftType.equalsIgnoreCase(filter.replace(" Shift", ""))) continue;
+                }
             }
+            
+            // Format times for display
+            String startTime = employee.getShiftStart() != null ? employee.getShiftStart().toString() : "-";
+            String endTime = employee.getShiftEnd() != null ? employee.getShiftEnd().toString() : "-";
+            String status = shiftType != null ? "Active" : "Not Assigned";
             
             Object[] row = {
                 employee.getFirstName() + " " + employee.getLastName(),
-                employee.getRole(),
+                role,
                 shiftType != null ? shiftType : "Unassigned",
-                employee.getShiftStart() != null ? employee.getShiftStart() : "-",
-                employee.getShiftEnd() != null ? employee.getShiftEnd() : "-",
-                shiftType != null ? "Active" : "Not Assigned"
+                startTime,
+                endTime,
+                status
             };
             tableModel.addRow(row);
         }
+        
+        // Update button states
+        boolean hasSelection = shiftsTable.getSelectedRow() != -1;
+        removeButton.setEnabled(hasSelection);
+        swapShiftButton.setEnabled(hasSelection);
     }
 
     private void showAssignDialog() {
@@ -261,9 +277,8 @@ public class ShiftManagementPanel extends JPanel {
             return;
         }
         
-        int employeeId = (int) tableModel.getValueAt(selectedRow, 0);
-        String employeeName = (String) tableModel.getValueAt(selectedRow, 1);
-        String currentShift = (String) tableModel.getValueAt(selectedRow, 3);
+        String employeeName = (String) tableModel.getValueAt(selectedRow, 0);
+        String currentShift = (String) tableModel.getValueAt(selectedRow, 2); // Column index 2 is shift type
         
         if ("Unassigned".equals(currentShift)) {
             JOptionPane.showMessageDialog(this,
@@ -273,13 +288,28 @@ public class ShiftManagementPanel extends JPanel {
             return;
         }
         
+        // Find employee ID from the name
+        String[] nameParts = employeeName.split(" ");
+        Employee employee = controller.getAllEmployees().stream()
+            .filter(e -> e.getFirstName().equals(nameParts[0]) && e.getLastName().equals(nameParts[1]))
+            .findFirst()
+            .orElse(null);
+            
+        if (employee == null) {
+            JOptionPane.showMessageDialog(this,
+                "Could not find employee information.",
+                "Error",
+                JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
         int confirm = JOptionPane.showConfirmDialog(this,
             "Are you sure you want to remove the shift for " + employeeName + "?",
             "Confirm Removal",
             JOptionPane.YES_NO_OPTION);
             
         if (confirm == JOptionPane.YES_OPTION) {
-            if (controller.removeShift(employeeId)) {
+            if (controller.removeShift(employee.getEmployeeId())) {
                 JOptionPane.showMessageDialog(this,
                     "Shift removed successfully!",
                     "Success",
@@ -373,10 +403,33 @@ public class ShiftManagementPanel extends JPanel {
     }
 
     private void showSwapShiftDialog() {
+        int selectedRow = shiftsTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this,
+                "Please select an employee to swap shifts with.",
+                "No Selection",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Get selected employee info
+        String selectedName = (String) tableModel.getValueAt(selectedRow, 0);
+        String currentShift = (String) tableModel.getValueAt(selectedRow, 2);
+        
+        if ("Unassigned".equals(currentShift)) {
+            JOptionPane.showMessageDialog(this,
+                "Selected employee doesn't have a shift to swap.",
+                "No Shift",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Create dialog
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
             "Swap Shifts", true);
         dialog.setLayout(new BorderLayout(10, 10));
 
+        // Create form panel
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         GridBagConstraints gbc = new GridBagConstraints();
@@ -384,57 +437,78 @@ public class ShiftManagementPanel extends JPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.insets = new Insets(5, 5, 5, 5);
 
-        // Get employees with assigned shifts
-        List<Employee> assignedEmployees = controller.getAllEmployees().stream()
-            .filter(e -> e.getShiftType() != null)
+        // Get employees with different shifts
+        List<Employee> otherEmployees = controller.getAllEmployees().stream()
+            .filter(e -> e.getShiftType() != null && 
+                        !e.getFirstName().equals(selectedName.split(" ")[0]) &&
+                        !e.getLastName().equals(selectedName.split(" ")[1]))
             .toList();
 
-        // First employee selection
-        JComboBox<Employee> employee1Combo = new JComboBox<>(
-            assignedEmployees.toArray(new Employee[0]));
-        
-        // Second employee selection
-        JComboBox<Employee> employee2Combo = new JComboBox<>(
-            assignedEmployees.toArray(new Employee[0]));
+        if (otherEmployees.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                "No other employees with shifts available for swapping.",
+                "No Available Employees",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Employee selection combo box
+        DefaultComboBoxModel<String> employeeModel = new DefaultComboBoxModel<>();
+        for (Employee emp : otherEmployees) {
+            employeeModel.addElement(emp.getFirstName() + " " + emp.getLastName() + 
+                                   " (" + emp.getShiftType() + ")");
+        }
+        JComboBox<String> employeeCombo = new JComboBox<>(employeeModel);
 
         // Add components to form
         gbc.gridy = 0;
-        formPanel.add(new JLabel("Employee 1:"), gbc);
+        formPanel.add(new JLabel("Selected Employee:"), gbc);
         gbc.gridx = 1;
-        formPanel.add(employee1Combo, gbc);
+        formPanel.add(new JLabel(selectedName + " (" + currentShift + ")"), gbc);
 
         gbc.gridy = 1;
         gbc.gridx = 0;
-        formPanel.add(new JLabel("Employee 2:"), gbc);
+        formPanel.add(new JLabel("Swap with:"), gbc);
         gbc.gridx = 1;
-        formPanel.add(employee2Combo, gbc);
+        formPanel.add(employeeCombo, gbc);
 
         // Create buttons panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton swapButton = createStyledButton("Swap", new Color(255, 193, 7));
-        JButton cancelButton = createStyledButton("Cancel", new Color(108, 117, 125));
+        JButton swapButton = new JButton("Swap");
+        JButton cancelButton = new JButton("Cancel");
 
         swapButton.addActionListener(e -> {
-            Employee emp1 = (Employee) employee1Combo.getSelectedItem();
-            Employee emp2 = (Employee) employee2Combo.getSelectedItem();
-
-            if (emp1 == emp2) {
-                JOptionPane.showMessageDialog(dialog,
-                    "Please select different employees.",
-                    "Invalid Selection",
-                    JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-
-            // Implement the shift swap logic here
-            // This would involve updating the database to swap the time_shiftid values
+            String targetName = ((String) employeeCombo.getSelectedItem()).split(" \\(")[0];
+            String[] targetNameParts = targetName.split(" ");
             
-            JOptionPane.showMessageDialog(dialog,
-                "Shifts swapped successfully!",
-                "Success",
-                JOptionPane.INFORMATION_MESSAGE);
-            dialog.dispose();
-            loadShifts();
+            // Find both employees
+            Employee emp1 = controller.getAllEmployees().stream()
+                .filter(emp -> emp.getFirstName().equals(selectedName.split(" ")[0]) && 
+                             emp.getLastName().equals(selectedName.split(" ")[1]))
+                .findFirst()
+                .orElse(null);
+                
+            Employee emp2 = controller.getAllEmployees().stream()
+                .filter(emp -> emp.getFirstName().equals(targetNameParts[0]) && 
+                             emp.getLastName().equals(targetNameParts[1]))
+                .findFirst()
+                .orElse(null);
+
+            if (emp1 != null && emp2 != null) {
+                if (controller.swapShifts(emp1.getEmployeeId(), emp2.getEmployeeId())) {
+                    JOptionPane.showMessageDialog(dialog,
+                        "Shifts swapped successfully!",
+                        "Success",
+                        JOptionPane.INFORMATION_MESSAGE);
+                    dialog.dispose();
+                    loadShifts();
+                } else {
+                    JOptionPane.showMessageDialog(dialog,
+                        "Failed to swap shifts. Please try again.",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                }
+            }
         });
 
         cancelButton.addActionListener(e -> dialog.dispose());
@@ -442,9 +516,11 @@ public class ShiftManagementPanel extends JPanel {
         buttonPanel.add(swapButton);
         buttonPanel.add(cancelButton);
 
+        // Add panels to dialog
         dialog.add(formPanel, BorderLayout.CENTER);
         dialog.add(buttonPanel, BorderLayout.SOUTH);
 
+        // Show dialog
         dialog.pack();
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
@@ -454,7 +530,7 @@ public class ShiftManagementPanel extends JPanel {
         int selectedRow = shiftsTable.getSelectedRow();
         if (selectedRow == -1) {
             JOptionPane.showMessageDialog(this,
-                "Please select an employee to schedule breaks.",
+                "Please select an employee to view/edit break schedule.",
                 "No Selection",
                 JOptionPane.WARNING_MESSAGE);
             return;
@@ -462,69 +538,61 @@ public class ShiftManagementPanel extends JPanel {
 
         String employeeName = (String) tableModel.getValueAt(selectedRow, 0);
         String shiftType = (String) tableModel.getValueAt(selectedRow, 2);
+        
+        if ("Unassigned".equals(shiftType)) {
+            JOptionPane.showMessageDialog(this,
+                "Employee doesn't have an assigned shift.",
+                "No Shift",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
 
+        // Create dialog
         JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-            "Schedule Breaks", true);
+            "Break Schedule", true);
         dialog.setLayout(new BorderLayout(10, 10));
 
-        JPanel formPanel = new JPanel(new GridBagLayout());
-        formPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        // Create info panel
+        JPanel infoPanel = new JPanel(new GridLayout(3, 1, 5, 5));
+        infoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        infoPanel.add(new JLabel("Employee: " + employeeName));
+        infoPanel.add(new JLabel("Shift: " + shiftType));
+        
+        // Add break time info based on shift type
+        String breakInfo;
+        if (shiftType.startsWith("Morning")) {
+            breakInfo = "Standard Break Time: 10:00 AM - 10:30 AM";
+        } else if (shiftType.startsWith("Afternoon")) {
+            breakInfo = "Standard Break Time: 3:00 PM - 3:30 PM";
+        } else {
+            breakInfo = "Standard Break Time: 8:00 PM - 8:30 PM";
+        }
+        infoPanel.add(new JLabel(breakInfo));
 
-        // Create time selection spinners
-        SpinnerDateModel startModel = new SpinnerDateModel();
-        JSpinner startSpinner = new JSpinner(startModel);
-        startSpinner.setEditor(new JSpinner.DateEditor(startSpinner, "HH:mm"));
+        // Create note
+        JTextArea noteArea = new JTextArea(
+            "Note: Break times are standardized for each shift to ensure proper coverage.\n" +
+            "Please coordinate with your supervisor for any special arrangements."
+        );
+        noteArea.setEditable(false);
+        noteArea.setLineWrap(true);
+        noteArea.setWrapStyleWord(true);
+        noteArea.setBackground(dialog.getBackground());
+        noteArea.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        SpinnerDateModel endModel = new SpinnerDateModel();
-        JSpinner endSpinner = new JSpinner(endModel);
-        endSpinner.setEditor(new JSpinner.DateEditor(endSpinner, "HH:mm"));
-
-        // Add components to form
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.gridwidth = 1;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(5, 5, 5, 5);
-
-        gbc.gridy = 0;
-        formPanel.add(new JLabel("Employee: " + employeeName), gbc);
-
-        gbc.gridy = 1;
-        formPanel.add(new JLabel("Shift: " + shiftType), gbc);
-
-        gbc.gridy = 2;
-        formPanel.add(new JLabel("Break Start:"), gbc);
-        gbc.gridx = 1;
-        formPanel.add(startSpinner, gbc);
-
-        gbc.gridy = 3;
-        gbc.gridx = 0;
-        formPanel.add(new JLabel("Break End:"), gbc);
-        gbc.gridx = 1;
-        formPanel.add(endSpinner, gbc);
-
-        // Create buttons
+        // Add components
+        dialog.add(infoPanel, BorderLayout.NORTH);
+        dialog.add(noteArea, BorderLayout.CENTER);
+        
+        // Add OK button
+        JButton okButton = new JButton("OK");
+        okButton.addActionListener(e -> dialog.dispose());
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton scheduleButton = createStyledButton("Schedule", new Color(40, 167, 69));
-        JButton cancelButton = createStyledButton("Cancel", new Color(108, 117, 125));
-
-        scheduleButton.addActionListener(e -> {
-            // Implement break scheduling logic here
-            JOptionPane.showMessageDialog(dialog,
-                "Break scheduled successfully!",
-                "Success",
-                JOptionPane.INFORMATION_MESSAGE);
-            dialog.dispose();
-        });
-
-        cancelButton.addActionListener(e -> dialog.dispose());
-
-        buttonPanel.add(scheduleButton);
-        buttonPanel.add(cancelButton);
-
-        dialog.add(formPanel, BorderLayout.CENTER);
+        buttonPanel.add(okButton);
         dialog.add(buttonPanel, BorderLayout.SOUTH);
 
-        dialog.pack();
+        // Show dialog
+        dialog.setSize(400, 250);
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
     }

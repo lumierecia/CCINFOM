@@ -923,4 +923,28 @@ public class RestaurantController {
     public Map<Integer, Double> getDishIngredients(int dishId) {
         return dishDAO.getDishIngredients(dishId);
     }
+<<<<<<< Updated upstream
 } 
+=======
+
+    public boolean swapShifts(int employee1Id, int employee2Id) {
+        String query = "UPDATE Employees e1, Employees e2 " +
+                      "SET e1.time_shiftid = @temp := e1.time_shiftid, " +
+                      "    e1.time_shiftid = e2.time_shiftid, " +
+                      "    e2.time_shiftid = @temp " +
+                      "WHERE e1.employee_id = ? AND e2.employee_id = ?";
+                      
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            
+            stmt.setInt(1, employee1Id);
+            stmt.setInt(2, employee2Id);
+            
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+} 
+>>>>>>> Stashed changes
