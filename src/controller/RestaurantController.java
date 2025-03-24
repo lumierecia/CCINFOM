@@ -908,8 +908,57 @@ public class RestaurantController {
         return dishDAO.getDishById(dishId);
     }
 
-    public boolean addDish(Dish dish) {
-        return dishDAO.addDish(dish);
+    public boolean addDish(Dish dish, Map<Integer, Double> ingredients) {
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // First add the dish
+                int dishId = dishDAO.addDishAndGetId(dish, conn);
+                if (dishId == -1) {
+                    conn.rollback();
+                    return false;
+                }
+
+                // Then add all ingredient requirements
+                for (Map.Entry<Integer, Double> entry : ingredients.entrySet()) {
+                    String query = """
+                        INSERT INTO DishIngredients (dish_id, ingredient_id, quantity_needed, unit_id)
+                        SELECT ?, ?, ?, unit_id
+                        FROM Ingredients
+                        WHERE ingredient_id = ?
+                    """;
+                    try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+                        pstmt.setInt(1, dishId);
+                        pstmt.setInt(2, entry.getKey());
+                        pstmt.setDouble(3, entry.getValue());
+                        pstmt.setInt(4, entry.getKey());
+                        
+                        if (pstmt.executeUpdate() != 1) {
+                            conn.rollback();
+                            return false;
+                        }
+                    }
+                }
+
+                conn.commit();
+                return true;
+            } catch (SQLException e) {
+                conn.rollback();
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(null,
+                    "Failed to add dish: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                "Database connection error: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
     }
 
     public boolean updateDish(Dish dish) {
@@ -922,26 +971,5 @@ public class RestaurantController {
 
     public Map<Integer, Double> getDishIngredients(int dishId) {
         return dishDAO.getDishIngredients(dishId);
-    }
-
-
-    public boolean swapShifts(int employee1Id, int employee2Id) {
-        String query = "UPDATE Employees e1, Employees e2 " +
-                      "SET e1.time_shiftid = @temp := e1.time_shiftid, " +
-                      "    e1.time_shiftid = e2.time_shiftid, " +
-                      "    e2.time_shiftid = @temp " +
-                      "WHERE e1.employee_id = ? AND e2.employee_id = ?";
-                      
-        try (Connection conn = getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
-            
-            stmt.setInt(1, employee1Id);
-            stmt.setInt(2, employee2Id);
-            
-            return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
     }
 } 
