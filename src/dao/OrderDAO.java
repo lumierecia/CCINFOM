@@ -8,48 +8,165 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
-import javax.swing.JOptionPane;
+import java.util.Collections;
 
 public class OrderDAO {
     private IngredientDAO ingredientDAO;
-    private Connection connection;
     private final TableDAO tableDAO;
 
     public OrderDAO() throws SQLException {
         this.ingredientDAO = new IngredientDAO();
-        this.connection = DatabaseConnection.getConnection();
         this.tableDAO = new TableDAO();
     }
 
-    public List<Order> getAllOrders() {
+    private Connection getConnection() throws SQLException {
+        return DatabaseConnection.getConnection();
+    }
+
+    public List<Order> getAllOrders() throws SQLException {
         List<Order> orders = new ArrayList<>();
-        String query = "SELECT * FROM Orders WHERE is_deleted = FALSE ORDER BY order_datetime DESC";
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(query)) {
-            while (rs.next()) {
-                Order order = new Order(
-                    rs.getInt("order_id"),
-                    rs.getInt("customer_id"),
-                    rs.getTimestamp("order_datetime"),
-                    rs.getString("order_type"),
-                    rs.getString("order_status"),
-                    rs.getString("payment_status"),
-                    rs.getDouble("total_amount"),
-                    rs.getString("payment_method")
-                );
-                order.setItems(getOrderItems(order.getOrderId()));
-                order.setAssignedEmployees(getAssignedEmployees(order.getOrderId()));
-                orders.add(order);
+        List<Integer> orderIds = new ArrayList<>();
+        
+        // First, get all orders
+        String orderQuery = "SELECT * FROM Orders WHERE is_deleted = FALSE ORDER BY order_datetime DESC";
+        try (Connection conn = getConnection()) {
+            try (PreparedStatement stmt = conn.prepareStatement(orderQuery);
+                 ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Order order = new Order(
+                        rs.getInt("order_id"),
+                        rs.getInt("customer_id"),
+                        rs.getTimestamp("order_datetime"),
+                        rs.getString("order_type"),
+                        rs.getString("order_status"),
+                        rs.getString("payment_status"),
+                        rs.getDouble("total_amount"),
+                        rs.getString("payment_method")
+                    );
+                    orders.add(order);
+                    orderIds.add(order.getOrderId());
+                }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+
+            if (!orderIds.isEmpty()) {
+                // Get all order items in a single query
+                String itemQuery = """
+                    SELECT oi.*, d.name as dish_name
+                    FROM OrderItems oi
+                    JOIN Dishes d ON oi.dish_id = d.dish_id
+                    WHERE oi.order_id IN (
+                """ + String.join(",", Collections.nCopies(orderIds.size(), "?")) + ")";
+
+                Map<Integer, List<OrderItem>> itemsMap = new HashMap<>();
+                try (PreparedStatement stmt = conn.prepareStatement(itemQuery)) {
+                    for (int i = 0; i < orderIds.size(); i++) {
+                        stmt.setInt(i + 1, orderIds.get(i));
+                    }
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) {
+                            OrderItem item = new OrderItem(
+                                rs.getInt("order_id"),
+                                rs.getInt("dish_id"),
+                                rs.getInt("quantity"),
+                                rs.getDouble("price_at_time"),
+                                rs.getString("dish_name")
+                            );
+                            itemsMap.computeIfAbsent(item.getOrderId(), k -> new ArrayList<>())
+                                   .add(item);
+                        }
+                    }
+                }
+
+                // Get all assigned employees in a single query
+                String employeeQuery = """
+                    SELECT order_id, employee_id
+                    FROM AssignedEmployeesToOrders
+                    WHERE order_id IN (
+                """ + String.join(",", Collections.nCopies(orderIds.size(), "?")) + ")";
+
+                Map<Integer, List<Integer>> employeesMap = new HashMap<>();
+                try (PreparedStatement stmt = conn.prepareStatement(employeeQuery)) {
+                    for (int i = 0; i < orderIds.size(); i++) {
+                        stmt.setInt(i + 1, orderIds.get(i));
+                    }
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) {
+                            int orderId = rs.getInt("order_id");
+                            int employeeId = rs.getInt("employee_id");
+                            employeesMap.computeIfAbsent(orderId, k -> new ArrayList<>())
+                                      .add(employeeId);
+                        }
+                    }
+                }
+
+                // Assign items and employees to orders
+                for (Order order : orders) {
+                    order.setItems(itemsMap.getOrDefault(order.getOrderId(), new ArrayList<>()));
+                    order.setAssignedEmployees(employeesMap.getOrDefault(order.getOrderId(), new ArrayList<>()));
+                }
+            }
         }
         return orders;
     }
 
-    public Order getOrderById(int orderId) {
+    private List<OrderItem> getOrderItems(Connection conn, int orderId) throws SQLException {
+        List<OrderItem> items = new ArrayList<>();
+        String query = """
+            SELECT oi.*, d.name as dish_name
+            FROM OrderItems oi
+            JOIN Dishes d ON oi.dish_id = d.dish_id
+            WHERE oi.order_id = ?
+        """;
+        
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, orderId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    OrderItem item = new OrderItem(
+                        rs.getInt("order_id"),
+                        rs.getInt("dish_id"),
+                        rs.getInt("quantity"),
+                        rs.getDouble("price_at_time"),
+                        rs.getString("dish_name")
+                    );
+                    items.add(item);
+                }
+            }
+        }
+        return items;
+    }
+
+    public List<OrderItem> getOrderItems(int orderId) throws SQLException {
+        try (Connection conn = getConnection()) {
+            return getOrderItems(conn, orderId);
+        }
+    }
+
+    public List<Integer> getAssignedEmployees(int orderId) throws SQLException {
+        try (Connection conn = getConnection()) {
+            return getAssignedEmployees(conn, orderId);
+        }
+    }
+
+    private List<Integer> getAssignedEmployees(Connection conn, int orderId) throws SQLException {
+        List<Integer> employeeIds = new ArrayList<>();
+        String query = "SELECT employee_id FROM AssignedEmployeesToOrders WHERE order_id = ?";
+        
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, orderId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    employeeIds.add(rs.getInt("employee_id"));
+                }
+            }
+        }
+        return employeeIds;
+    }
+
+    public Order getOrderById(int orderId) throws SQLException {
         String query = "SELECT * FROM Orders WHERE order_id = ? AND is_deleted = FALSE";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setInt(1, orderId);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
@@ -63,31 +180,13 @@ public class OrderDAO {
                         rs.getDouble("total_amount"),
                         rs.getString("payment_method")
                     );
-                    order.setItems(getOrderItems(order.getOrderId()));
-                    order.setAssignedEmployees(getAssignedEmployees(order.getOrderId()));
+                    order.setItems(getOrderItems(conn, order.getOrderId()));
+                    order.setAssignedEmployees(getAssignedEmployees(conn, order.getOrderId()));
                     return order;
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return null;
-    }
-
-    public List<Integer> getAssignedEmployees(int orderId) {
-        List<Integer> employees = new ArrayList<>();
-        String query = "SELECT employee_id FROM AssignedEmployeesToOrders WHERE order_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setInt(1, orderId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    employees.add(rs.getInt("employee_id"));
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return employees;
     }
 
     public int createOrder(Order order) throws SQLException {
@@ -130,7 +229,7 @@ public class OrderDAO {
         }
     }
 
-    private boolean checkIngredientAvailability(Order order) {
+    private boolean checkIngredientAvailability(Order order) throws SQLException {
         Map<Integer, Double> requiredIngredients = new HashMap<>();
         
         // Calculate total required ingredients
@@ -143,7 +242,8 @@ public class OrderDAO {
         
         // Check if we have enough of each ingredient
         String query = "SELECT ingredient_id, quantity_in_stock FROM Ingredients WHERE ingredient_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
             for (Map.Entry<Integer, Double> entry : requiredIngredients.entrySet()) {
                 pstmt.setInt(1, entry.getKey());
                 try (ResultSet rs = pstmt.executeQuery()) {
@@ -156,13 +256,10 @@ public class OrderDAO {
                 }
             }
             return true;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
         }
     }
 
-    private Map<Integer, Double> getRequiredIngredientsForItem(OrderItem item) {
+    private Map<Integer, Double> getRequiredIngredientsForItem(OrderItem item) throws SQLException {
         Map<Integer, Double> ingredients = new HashMap<>();
         String query = """
             SELECT di.ingredient_id, di.quantity_needed * ? as required_quantity
@@ -170,7 +267,8 @@ public class OrderDAO {
             WHERE di.dish_id = ?
         """;
         
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setInt(1, item.getQuantity());
             pstmt.setInt(2, item.getDishId());
             
@@ -182,13 +280,11 @@ public class OrderDAO {
                     );
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return ingredients;
     }
 
-    private boolean deductIngredients(Order order) {
+    private boolean deductIngredients(Order order) throws SQLException {
         Map<Integer, Double> requiredIngredients = new HashMap<>();
         
         // Calculate total required ingredients
@@ -215,9 +311,10 @@ public class OrderDAO {
         return true;
     }
 
-    private boolean addOrderItems(Order order) {
+    private boolean addOrderItems(Order order) throws SQLException {
         String query = "INSERT INTO OrderItems (order_id, dish_id, quantity, price_at_time) VALUES (?, ?, ?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
             for (OrderItem item : order.getItems()) {
                 pstmt.setInt(1, order.getOrderId());
                 pstmt.setInt(2, item.getDishId());
@@ -227,15 +324,13 @@ public class OrderDAO {
             }
             int[] results = pstmt.executeBatch();
             return results.length == order.getItems().size();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
         }
     }
 
-    private boolean assignEmployeesToOrder(Order order) {
+    private boolean assignEmployeesToOrder(Order order) throws SQLException {
         String query = "INSERT INTO AssignedEmployeesToOrders (order_id, employee_id) VALUES (?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
             for (Integer employeeId : order.getAssignedEmployees()) {
                 pstmt.setInt(1, order.getOrderId());
                 pstmt.setInt(2, employeeId);
@@ -243,28 +338,24 @@ public class OrderDAO {
             }
             int[] results = pstmt.executeBatch();
             return results.length == order.getAssignedEmployees().size();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
         }
     }
 
-    public boolean updateOrderStatus(int orderId, String status) {
+    public boolean updateOrderStatus(int orderId, String status) throws SQLException {
         String query = "UPDATE Orders SET order_status = ? WHERE order_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setString(1, status);
             pstmt.setInt(2, orderId);
             return pstmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
         }
     }
 
-    public List<Order> getOrdersByDateRange(String startDate, String endDate) {
+    public List<Order> getOrdersByDateRange(String startDate, String endDate) throws SQLException {
         List<Order> orders = new ArrayList<>();
         String query = "SELECT * FROM Orders WHERE DATE(order_datetime) BETWEEN ? AND ? ORDER BY order_datetime DESC";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setString(1, startDate);
             pstmt.setString(2, endDate);
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -279,55 +370,27 @@ public class OrderDAO {
                         rs.getDouble("total_amount"),
                         rs.getString("payment_method")
                     );
-                    order.setItems(getOrderItems(order.getOrderId()));
-                    order.setAssignedEmployees(getAssignedEmployees(order.getOrderId()));
+                    order.setItems(getOrderItems(conn, order.getOrderId()));
+                    order.setAssignedEmployees(getAssignedEmployees(conn, order.getOrderId()));
                     orders.add(order);
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return orders;
     }
 
-    public List<OrderItem> getOrderItems(int orderId) {
-        List<OrderItem> items = new ArrayList<>();
-        String query = """
-            SELECT oi.*, d.name as dish_name 
-            FROM OrderItems oi 
-            JOIN Dishes d ON oi.dish_id = d.dish_id 
-            WHERE oi.order_id = ?
-        """;
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setInt(1, orderId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    OrderItem item = new OrderItem(
-                        rs.getInt("order_id"),
-                        rs.getInt("dish_id"),
-                        rs.getInt("quantity"),
-                        rs.getDouble("price_at_time"),
-                        rs.getString("dish_name")
-                    );
-                    items.add(item);
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Error fetching order items: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
-        }
-        return items;
-    }
-
-    public List<Order> getOrdersByCustomerId(int customerId) {
+    public List<Order> getOrdersByCustomerId(int customerId) throws SQLException {
         List<Order> orders = new ArrayList<>();
-        String query = "SELECT * FROM Orders WHERE customer_id = ? ORDER BY order_datetime DESC";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-            pstmt.setInt(1, customerId);
-            try (ResultSet rs = pstmt.executeQuery()) {
+        String query = """
+            SELECT * FROM Orders 
+            WHERE customer_id = ? AND is_deleted = FALSE 
+            ORDER BY order_datetime DESC
+        """;
+        
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, customerId);
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     Order order = new Order(
                         rs.getInt("order_id"),
@@ -339,18 +402,16 @@ public class OrderDAO {
                         rs.getDouble("total_amount"),
                         rs.getString("payment_method")
                     );
-                    order.setItems(getOrderItems(order.getOrderId()));
-                    order.setAssignedEmployees(getAssignedEmployees(order.getOrderId()));
+                    order.setItems(getOrderItems(conn, order.getOrderId()));
+                    order.setAssignedEmployees(getAssignedEmployees(conn, order.getOrderId()));
                     orders.add(order);
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return orders;
     }
 
-    public double calculateOrderTotal(int orderId) {
+    public double calculateOrderTotal(int orderId) throws SQLException {
         List<OrderItem> items = getOrderItems(orderId);
         double total = 0.0;
         for (OrderItem item : items) {
@@ -359,27 +420,25 @@ public class OrderDAO {
         return total;
     }
 
-    public boolean deleteOrder(int orderId) {
+    public boolean deleteOrder(int orderId) throws SQLException {
         String updateQuery = "UPDATE Orders SET is_deleted = TRUE WHERE order_id = ?";
-        try (PreparedStatement stmt = connection.prepareStatement(updateQuery)) {
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(updateQuery)) {
             stmt.setInt(1, orderId);
             return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
         }
     }
 
-    public List<Order> getDeletedOrders() {
+    public List<Order> getDeletedOrders() throws SQLException {
         List<Order> orders = new ArrayList<>();
         String query = "SELECT o.*, c.first_name, c.last_name FROM Orders o " +
                       "JOIN Customers c ON o.customer_id = c.customer_id " +
                       "WHERE o.is_deleted = TRUE " +
                       "ORDER BY o.order_datetime DESC";
         
-        try (Statement stmt = connection.createStatement();
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
-            
             while (rs.next()) {
                 Order order = new Order(
                     rs.getInt("order_id"),
@@ -394,37 +453,23 @@ public class OrderDAO {
                 order.setCustomerName(rs.getString("first_name") + " " + rs.getString("last_name"));
                 orders.add(order);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Failed to fetch deleted orders: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
         }
         return orders;
     }
 
-    public boolean restoreOrder(int orderId) {
+    public boolean restoreOrder(int orderId) throws SQLException {
         String query = "UPDATE Orders SET is_deleted = FALSE WHERE order_id = ?";
-        
-        try (Connection conn = connection;
+        try (Connection conn = getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
-            
             stmt.setInt(1, orderId);
             return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Failed to restore order: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
-            return false;
         }
     }
 
-    public boolean addOrderItems(int orderId, List<OrderItem> items) {
+    public boolean addOrderItems(int orderId, List<OrderItem> items) throws SQLException {
         String query = "INSERT INTO OrderItems (order_id, dish_id, quantity, price_at_time) VALUES (?, ?, ?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
             for (OrderItem item : items) {
                 pstmt.setInt(1, orderId);
                 pstmt.setInt(2, item.getDishId());
@@ -434,15 +479,13 @@ public class OrderDAO {
             }
             int[] results = pstmt.executeBatch();
             return results.length == items.size();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
         }
     }
 
-    public boolean assignEmployeesToOrder(int orderId, List<Integer> employeeIds) {
+    public boolean assignEmployeesToOrder(int orderId, List<Integer> employeeIds) throws SQLException {
         String query = "INSERT INTO AssignedEmployeesToOrders (order_id, employee_id) VALUES (?, ?)";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
             for (Integer employeeId : employeeIds) {
                 pstmt.setInt(1, orderId);
                 pstmt.setInt(2, employeeId);
@@ -450,16 +493,14 @@ public class OrderDAO {
             }
             int[] results = pstmt.executeBatch();
             return results.length == employeeIds.size();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
         }
     }
 
-    public List<Order> getAllActiveOrders() {
+    public List<Order> getAllActiveOrders() throws SQLException {
         List<Order> orders = new ArrayList<>();
         String query = "SELECT * FROM Orders WHERE is_deleted = FALSE ORDER BY order_datetime DESC";
-        try (Statement stmt = connection.createStatement();
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
                 Order order = new Order(
@@ -472,31 +513,27 @@ public class OrderDAO {
                     rs.getDouble("total_amount"),
                     rs.getString("payment_method")
                 );
-                order.setItems(getOrderItems(order.getOrderId()));
-                order.setAssignedEmployees(getAssignedEmployees(order.getOrderId()));
+                order.setItems(getOrderItems(conn, order.getOrderId()));
+                order.setAssignedEmployees(getAssignedEmployees(conn, order.getOrderId()));
                 orders.add(order);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return orders;
     }
 
-    public boolean updatePaymentStatus(int orderId, String paymentMethod, String paymentStatus) {
+    public boolean updatePaymentStatus(int orderId, String paymentMethod, String paymentStatus) throws SQLException {
         String query = "UPDATE Orders SET payment_method = ?, payment_status = ? WHERE order_id = ?";
-        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setString(1, paymentMethod);
             pstmt.setString(2, paymentStatus);
             pstmt.setInt(3, orderId);
             return pstmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
         }
     }
 
     public boolean completeOrder(int orderId) throws SQLException {
-        try (Connection conn = DatabaseConnection.getConnection()) {
+        try (Connection conn = getConnection()) {
             conn.setAutoCommit(false);
             try {
                 // Get order details first
@@ -529,7 +566,7 @@ public class OrderDAO {
     }
 
     public boolean cancelOrder(int orderId) throws SQLException {
-        try (Connection conn = DatabaseConnection.getConnection()) {
+        try (Connection conn = getConnection()) {
             conn.setAutoCommit(false);
             try {
                 // Get order details first
@@ -559,5 +596,9 @@ public class OrderDAO {
                 throw e;
             }
         }
+    }
+
+    public List<Order> getCustomerOrders(int customerId) throws SQLException {
+        return getOrdersByCustomerId(customerId);
     }
 } 
