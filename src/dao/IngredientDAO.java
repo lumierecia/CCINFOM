@@ -331,8 +331,7 @@ public class IngredientDAO {
         Connection conn = null;
         try {
             conn = getConnection();
-            conn.setAutoCommit(false);
-
+            
             // Update stock level
             String updateQuery = "UPDATE Ingredients SET quantity_in_stock = quantity_in_stock + ?, " +
                                "last_restock_date = CURRENT_TIMESTAMP, last_restocked_by = ? " +
@@ -346,7 +345,7 @@ public class IngredientDAO {
                 if (updateStmt.executeUpdate() > 0) {
                     // Record the transaction
                     String transactionQuery = "INSERT INTO IngredientTransactions " +
-                                           "(ingredient_id, quantity_changed, employee_id, " +
+                                           "(ingredient_id, quantity_change, employee_id, " +
                                            "transaction_type, notes) VALUES (?, ?, ?, ?, ?)";
                     
                     try (PreparedStatement transactionStmt = conn.prepareStatement(transactionQuery)) {
@@ -356,38 +355,18 @@ public class IngredientDAO {
                         transactionStmt.setString(4, transactionType);
                         transactionStmt.setString(5, notes);
                         
-                        if (transactionStmt.executeUpdate() > 0) {
-                            conn.commit();
-                            return true;
-                        }
+                        return transactionStmt.executeUpdate() > 0;
                     }
                 }
             }
-            
-            conn.rollback();
             return false;
         } catch (SQLException e) {
-            if (conn != null) {
-                try {
-                    conn.rollback();
-                } catch (SQLException rollbackEx) {
-                    rollbackEx.printStackTrace();
-                }
-            }
             e.printStackTrace();
             JOptionPane.showMessageDialog(null,
                 "Failed to update stock: " + e.getMessage(),
                 "Database Error",
                 JOptionPane.ERROR_MESSAGE);
             return false;
-        } finally {
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-            }
         }
     }
 
