@@ -50,9 +50,13 @@ public class IngredientBatchDAO {
             stmt.setInt(1, batch.getIngredientId());
             stmt.setInt(2, batch.getSupplierId());
             stmt.setDouble(3, batch.getQuantity());
-            stmt.setDate(4, new java.sql.Date(batch.getExpiryDate().getTime()));
+            if (batch.getExpiryDate() != null) {
+                stmt.setDate(4, new java.sql.Date(batch.getExpiryDate().getTime()));
+            } else {
+                stmt.setNull(4, Types.DATE);
+            }
             stmt.setDouble(5, batch.getPurchasePrice());
-            stmt.setDouble(6, batch.getRemainingQuantity());
+            stmt.setDouble(6, batch.getQuantity()); // Initial remaining quantity equals total quantity
 
             int affectedRows = stmt.executeUpdate();
             if (affectedRows > 0) {

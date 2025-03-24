@@ -267,7 +267,7 @@ public class IngredientDAO {
             }
             
             // Then delete the ingredient
-            String deleteIngredientQuery = "DELETE FROM Ingredients WHERE ingredient_id = ?";
+            String deleteIngredientQuery = "UPDATE Ingredients SET is_deleted = TRUE WHERE ingredient_id = ?";
             try (PreparedStatement deleteIngredientStmt = conn.prepareStatement(deleteIngredientQuery)) {
                 deleteIngredientStmt.setInt(1, ingredientId);
                 if (deleteIngredientStmt.executeUpdate() > 0) {
@@ -307,7 +307,7 @@ public class IngredientDAO {
         List<Ingredient> lowStockIngredients = new ArrayList<>();
         String query = "SELECT i.*, u.unit_name FROM Ingredients i " +
                       "JOIN Units u ON i.unit_id = u.unit_id " +
-                      "WHERE i.quantity_in_stock <= i.minimum_stock_level";
+                      "WHERE i.quantity_in_stock <= i.minimum_stock_level AND i.is_deleted = FALSE";
         
         try (Statement stmt = getConnection().createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
@@ -335,7 +335,7 @@ public class IngredientDAO {
             // Update stock level
             String updateQuery = "UPDATE Ingredients SET quantity_in_stock = quantity_in_stock + ?, " +
                                "last_restock_date = CURRENT_TIMESTAMP, last_restocked_by = ? " +
-                               "WHERE ingredient_id = ?";
+                               "WHERE ingredient_id = ? AND is_deleted = FALSE";
             
             try (PreparedStatement updateStmt = conn.prepareStatement(updateQuery)) {
                 updateStmt.setDouble(1, quantity);
@@ -375,7 +375,7 @@ public class IngredientDAO {
         String query = "SELECT di.ingredient_id, di.quantity_needed * i.cost_per_unit as total_cost " +
                       "FROM DishIngredients di " +
                       "JOIN Ingredients i ON di.ingredient_id = i.ingredient_id " +
-                      "WHERE di.product_id = ?";
+                      "WHERE di.product_id = ? AND i.is_deleted = FALSE";
         
         try (PreparedStatement stmt = getConnection().prepareStatement(query)) {
             stmt.setInt(1, productId);
@@ -392,5 +392,56 @@ public class IngredientDAO {
                 JOptionPane.ERROR_MESSAGE);
         }
         return costs;
+    }
+
+    public List<Ingredient> getDeletedIngredients() {
+        List<Ingredient> ingredients = new ArrayList<>();
+        String query = """
+            SELECT i.*, u.unit_name
+            FROM Ingredients i 
+            JOIN Units u ON i.unit_id = u.unit_id
+            WHERE i.is_deleted = TRUE
+            ORDER BY i.name
+        """;
+        
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            
+            while (rs.next()) {
+                Ingredient ingredient = mapResultSetToIngredient(rs);
+                loadSupplierPrices(ingredient);
+                ingredients.add(ingredient);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return ingredients;
+    }
+
+    private Ingredient mapResultSetToIngredient(ResultSet rs) throws SQLException {
+        return new Ingredient(
+            rs.getInt("ingredient_id"),
+            rs.getString("name"),
+            rs.getInt("unit_id"),
+            rs.getString("unit_name"),
+            rs.getDouble("quantity_in_stock"),
+            rs.getDouble("minimum_stock_level"),
+            rs.getDouble("cost_per_unit"),
+            rs.getTimestamp("last_restock_date"),
+            rs.getInt("last_restocked_by")
+        );
+    }
+
+    public boolean restoreIngredient(int ingredientId) {
+        String query = "UPDATE Ingredients SET is_deleted = FALSE WHERE ingredient_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, ingredientId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 } 

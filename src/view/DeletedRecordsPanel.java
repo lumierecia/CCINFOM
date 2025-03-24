@@ -165,7 +165,7 @@ public class DeletedRecordsPanel extends JPanel {
         JPanel panel = new JPanel(new BorderLayout());
         
         // Create table
-        String[] columns = {"ID", "Name", "Category", "Status", "Last Updated"};
+        String[] columns = {"ID", "Name", "Unit", "Cost/Unit", "Stock Level", "Last Updated"};
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -178,16 +178,15 @@ public class DeletedRecordsPanel extends JPanel {
         JScrollPane scrollPane = new JScrollPane(deletedInventoryTable);
         panel.add(scrollPane, BorderLayout.CENTER);
         
-        // Add info label since soft deletion is not supported for inventory
-        JLabel infoLabel = new JLabel("Note: Inventory items use direct deletion for better data consistency.");
-        infoLabel.setForeground(Color.GRAY);
-        infoLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        // Add restore button
+        JButton restoreButton = new JButton("Restore Selected");
+        restoreButton.addActionListener(e -> restoreSelectedIngredient());
         
-        JPanel bottomPanel = new JPanel(new BorderLayout());
-        bottomPanel.add(infoLabel, BorderLayout.CENTER);
-        panel.add(bottomPanel, BorderLayout.SOUTH);
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.add(restoreButton);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
         
-        tabbedPane.addTab("Inventory", panel);
+        tabbedPane.addTab("Ingredients", panel);
     }
 
     private void restoreSelectedCustomer() {
@@ -234,9 +233,16 @@ public class DeletedRecordsPanel extends JPanel {
         }
     }
 
-    /*private void restoreSelectedInventoryItem() {
-        // Not implemented since inventory items use direct deletion
-    }*/
+    private void restoreSelectedIngredient() {
+        int selectedRow = deletedInventoryTable.getSelectedRow();
+        if (selectedRow >= 0) {
+            int ingredientId = (int) deletedInventoryTable.getValueAt(selectedRow, 0);
+            if (controller.restoreIngredient(ingredientId)) {
+                refreshInventoryTable();
+                JOptionPane.showMessageDialog(this, "Ingredient restored successfully!");
+            }
+        }
+    }
 
     public void refreshAllTables() {
         refreshCustomersTable();
@@ -309,14 +315,15 @@ public class DeletedRecordsPanel extends JPanel {
     private void refreshInventoryTable() {
         DefaultTableModel model = (DefaultTableModel) deletedInventoryTable.getModel();
         model.setRowCount(0);
-        List<Inventory> deletedItems = controller.getDeletedInventoryItems();
-        for (Inventory item : deletedItems) {
+        List<Ingredient> deletedItems = controller.getDeletedIngredients();
+        for (Ingredient item : deletedItems) {
             model.addRow(new Object[]{
-                item.getProductId(),
-                item.getProductName(),
-                item.getCategoryName(),
-                item.getStatus(),
-                item.getLastUpdated()
+                item.getIngredientId(),
+                item.getName(),
+                item.getUnitName(),
+                item.getCostPerUnit(),
+                item.getMinimumStockLevel(),
+                item.getLastRestockDate()
             });
         }
     }

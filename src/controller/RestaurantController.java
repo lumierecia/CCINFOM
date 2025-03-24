@@ -861,6 +861,14 @@ public class RestaurantController {
         return ingredientDAO.deleteIngredient(ingredientId);
     }
 
+    public List<Ingredient> getDeletedIngredients() {
+        return ingredientDAO.getDeletedIngredients();
+    }
+
+    public boolean restoreIngredient(int ingredientId) {
+        return ingredientDAO.restoreIngredient(ingredientId);
+    }
+
     public List<IngredientBatch> getAllIngredientBatches() {
         return ingredientBatchDAO.getBatchesByIngredient(-1); // Get all batches
     }

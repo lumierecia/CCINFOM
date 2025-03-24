@@ -105,18 +105,24 @@ public class InventoryDAO {
 
     public boolean deleteInventoryItem(int productId) {
         String query = "UPDATE InventoryItems SET is_deleted = TRUE WHERE product_id = ?";
-        
         try (Connection conn = getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
-            
             stmt.setInt(1, productId);
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Failed to delete inventory item: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
+    public boolean restoreInventoryItem(int productId) {
+        String query = "UPDATE InventoryItems SET is_deleted = FALSE WHERE product_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, productId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
             return false;
         }
     }
@@ -182,24 +188,6 @@ public class InventoryDAO {
                 JOptionPane.ERROR_MESSAGE);
         }
         return items;
-    }
-
-    public boolean restoreInventoryItem(int productId) {
-        String query = "UPDATE InventoryItems SET is_deleted = FALSE WHERE product_id = ?";
-        
-        try (Connection conn = getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
-            
-            stmt.setInt(1, productId);
-            return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Failed to restore inventory item: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
-            return false;
-        }
     }
 
     private Inventory mapResultSetToInventory(ResultSet rs) throws SQLException {
