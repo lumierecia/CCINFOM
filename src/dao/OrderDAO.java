@@ -100,22 +100,13 @@ public class OrderDAO {
             originalAutoCommit = conn.getAutoCommit();
             conn.setAutoCommit(false);
 
-            // First check if we have enough ingredients
-            if (!deductIngredients(conn, order.getOrderId(), order.getItems())) {
-                conn.rollback();
-                JOptionPane.showMessageDialog(null,
-                    "Failed to place order. Please check ingredient availability.",
-                    "Order Error",
-                    JOptionPane.ERROR_MESSAGE);
-                return -1;
-            }
-
-            // Insert the order
+            // First insert the order to get the order ID
             String query = """
                 INSERT INTO Orders (customer_id, order_type, order_status, total_amount, payment_status)
                 VALUES (?, ?, ?, ?, ?)
             """;
             
+            int orderId;
             try (PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
                 stmt.setInt(1, order.getCustomerId());
                 stmt.setString(2, order.getOrderType());
@@ -129,7 +120,6 @@ public class OrderDAO {
                     return -1;
                 }
 
-                int orderId;
                 try (ResultSet rs = stmt.getGeneratedKeys()) {
                     if (rs.next()) {
                         orderId = rs.getInt(1);
@@ -139,22 +129,32 @@ public class OrderDAO {
                         return -1;
                     }
                 }
-
-                // Add order items
-                if (!addOrderItems(conn, orderId, order.getItems())) {
-                    conn.rollback();
-                    return -1;
-                }
-
-                // Assign employees
-                if (!assignEmployeesToOrder(conn, orderId, order.getAssignedEmployees())) {
-                    conn.rollback();
-                    return -1;
-                }
-
-                conn.commit();
-                return orderId;
             }
+
+            // Now check and deduct ingredients with the valid order ID
+            if (!deductIngredients(conn, orderId, order.getItems())) {
+                conn.rollback();
+                JOptionPane.showMessageDialog(null,
+                    "Failed to place order. Please check ingredient availability.",
+                    "Order Error",
+                    JOptionPane.ERROR_MESSAGE);
+                return -1;
+            }
+
+            // Add order items
+            if (!addOrderItems(conn, orderId, order.getItems())) {
+                conn.rollback();
+                return -1;
+            }
+
+            // Assign employees
+            if (!assignEmployeesToOrder(conn, orderId, order.getAssignedEmployees())) {
+                conn.rollback();
+                return -1;
+            }
+
+            conn.commit();
+            return orderId;
         } catch (SQLException e) {
             try {
                 if (conn != null) {
