@@ -236,7 +236,9 @@ INSERT INTO Ingredients (name, unit_id, quantity_in_stock, minimum_stock_level, 
 ('Eggs', 3, 100.00, 20.00, 8.00, 1),            -- 16: pieces
 ('Milk', 2, 30.00, 5.00, 80.00, 1),             -- 17: liters
 ('Potatoes', 1, 40.00, 8.00, 60.00, 1),         -- 18: kg
-('Mayonnaise', 1, 10.00, 2.00, 150.00, 1);      -- 19: kg
+('Mayonnaise', 1, 10.00, 2.00, 150.00, 1),      -- 19: kg
+('Kangkong', 1, 20.00, 5.00, 80.00, 1),         -- 20: kg
+('Radish', 1, 15.00, 3.00, 70.00, 1);           -- 21: kg
 
 INSERT INTO IngredientSuppliers (ingredient_id, supplier_id, unit_price, lead_time_days, minimum_order_quantity, is_primary_supplier) VALUES
 (1, 1, 48.00, 2, 50.00, TRUE),   -- Rice from Metro
@@ -248,7 +250,9 @@ INSERT INTO IngredientSuppliers (ingredient_id, supplier_id, unit_price, lead_ti
 (7, 3, 72.00, 3, 5.00, TRUE),    -- Vinegar from Quality
 (8, 1, 115.00, 2, 5.00, TRUE),   -- Garlic from Metro
 (9, 1, 87.00, 2, 5.00, TRUE),    -- Onion from Metro
-(10, 1, 92.00, 2, 5.00, TRUE);   -- Tomato from Metro
+(10, 1, 92.00, 2, 5.00, TRUE),   -- Tomato from Metro
+(20, 1, 75.00, 1, 5.00, TRUE),   -- Kangkong from Metro
+(21, 1, 65.00, 1, 5.00, TRUE);   -- Radish from Metro
 
 INSERT INTO Dishes (name, category_id, selling_price, recipe_instructions) VALUES
 ('Pork Sinigang', 1, 250.00, 'Boil pork with vegetables in tamarind-based soup until tender.'),
