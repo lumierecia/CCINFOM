@@ -10,11 +10,13 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.List;
 import javax.swing.ListSelectionModel;
+import java.util.ArrayList;
 
 public class PaymentPanel extends JPanel {
     private final RestaurantController controller;
     private JTable ordersTable;
     private DefaultTableModel tableModel;
+    private List<Integer> orderIds = new ArrayList<>();
 
     public PaymentPanel(RestaurantController controller) {
         this.controller = controller;
@@ -111,6 +113,7 @@ public class PaymentPanel extends JPanel {
 
     private void loadUnpaidOrders() {
         tableModel.setRowCount(0);
+        orderIds.clear();
         List<Order> orders = controller.getAllOrders();
         
         for (Order order : orders) {
@@ -122,10 +125,11 @@ public class PaymentPanel extends JPanel {
                     customer.getFirstName() + " " + customer.getLastName(),
                     order.getOrderType(),
                     order.getOrderDateTime(),
-                    String.format("₱%.2f", order.getTotalAmount()),
+                    String.format("₱%.2f", total),
                     order.getOrderStatus()
                 };
                 tableModel.addRow(row);
+                orderIds.add(order.getOrderId());
             }
         }
     }
@@ -134,7 +138,7 @@ public class PaymentPanel extends JPanel {
         int selectedRow = ordersTable.getSelectedRow();
         if (selectedRow == -1) return;
 
-        int orderId = (int) tableModel.getValueAt(selectedRow, 0);
+        int orderId = orderIds.get(selectedRow);
         Order order = controller.getOrderById(orderId);
         if (order == null) return;
 
@@ -198,7 +202,7 @@ public class PaymentPanel extends JPanel {
             return;
         }
 
-        int orderId = (int) tableModel.getValueAt(selectedRow, 0);
+        int orderId = orderIds.get(selectedRow);
         Order order = controller.getOrderById(orderId);
         if (order == null) {
             JOptionPane.showMessageDialog(this,
@@ -233,14 +237,14 @@ public class PaymentPanel extends JPanel {
         formPanel.add(new JLabel(String.valueOf(orderId)));
         
         formPanel.add(new JLabel("Customer:"));
-        formPanel.add(new JLabel((String) tableModel.getValueAt(selectedRow, 1)));
+        formPanel.add(new JLabel((String) tableModel.getValueAt(selectedRow, 0)));
         
         formPanel.add(new JLabel("Order Type:"));
-        formPanel.add(new JLabel((String) tableModel.getValueAt(selectedRow, 2)));
+        formPanel.add(new JLabel((String) tableModel.getValueAt(selectedRow, 1)));
 
         // Add total with bold font
         JLabel totalLabel = new JLabel("Total Amount:");
-        JLabel totalValueLabel = new JLabel(String.format("$%.2f", total));
+        JLabel totalValueLabel = new JLabel(String.format("₱%.2f", total));
         Font boldFont = totalValueLabel.getFont().deriveFont(Font.BOLD);
         totalValueLabel.setFont(boldFont);
         formPanel.add(totalLabel);
@@ -260,7 +264,7 @@ public class PaymentPanel extends JPanel {
 
         // Add change due field
         JLabel changeDueLabel = new JLabel("Change Due:");
-        JLabel changeValueLabel = new JLabel("$0.00");
+        JLabel changeValueLabel = new JLabel("₱0.00");
         changeValueLabel.setFont(boldFont);
         formPanel.add(changeDueLabel);
         formPanel.add(changeValueLabel);
@@ -271,10 +275,10 @@ public class PaymentPanel extends JPanel {
                 try {
                     double received = Double.parseDouble(amountField.getText().trim());
                     double change = received - total;
-                    changeValueLabel.setText(String.format("$%.2f", Math.max(0, change)));
+                    changeValueLabel.setText(String.format("₱%.2f", Math.max(0, change)));
                     changeValueLabel.setForeground(change >= 0 ? Color.BLACK : Color.RED);
                 } catch (NumberFormatException ex) {
-                    changeValueLabel.setText("$0.00");
+                    changeValueLabel.setText("₱0.00");
                     changeValueLabel.setForeground(Color.BLACK);
                 }
             }
@@ -296,7 +300,7 @@ public class PaymentPanel extends JPanel {
             changeValueLabel.setEnabled(isCash);
             if (!isCash) {
                 amountField.setText("");
-                changeValueLabel.setText("$0.00");
+                changeValueLabel.setText("₱0.00");
                 changeValueLabel.setForeground(Color.BLACK);
             }
         });
@@ -340,14 +344,14 @@ public class PaymentPanel extends JPanel {
                             Payment processed successfully!
                             
                             Order ID: %d
-                            Total Amount: $%.2f
+                            Total Amount: ₱%.2f
                             Payment Method: %s%s
                             """,
                             orderId,
                             total,
                             selectedMethod,
                             "Cash".equals(selectedMethod) 
-                                ? String.format("\nAmount Received: $%.2f\nChange Due: $%.2f",
+                                ? String.format("\nAmount Received: ₱%.2f\nChange Due: ₱%.2f",
                                     amountReceived,
                                     amountReceived - total)
                                 : ""),
@@ -355,6 +359,11 @@ public class PaymentPanel extends JPanel {
                         JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     loadUnpaidOrders(); // Refresh the table
+                } else {
+                    JOptionPane.showMessageDialog(dialog,
+                        "Failed to process payment. Please try again.",
+                        "Payment Failed",
+                        JOptionPane.ERROR_MESSAGE);
                 }
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(dialog,
