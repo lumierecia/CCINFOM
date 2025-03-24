@@ -12,6 +12,7 @@ import java.awt.event.*;
 import java.sql.SQLException;
 import java.util.List;
 import javax.swing.ListSelectionModel;
+import java.util.stream.Collectors;
 
 public class PaymentPanel extends JPanel {
     private final RestaurantController controller;
@@ -22,7 +23,16 @@ public class PaymentPanel extends JPanel {
         this.controller = controller;
         setLayout(new BorderLayout(10, 10));
         initComponents();
-        loadUnpaidOrders();
+        try {
+            loadUnpaidOrders();
+        } catch (SQLException e) {
+            SwingUtilities.invokeLater(() -> {
+                JOptionPane.showMessageDialog(this,
+                    "Error loading unpaid orders: " + e.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+            });
+        }
     }
 
     private void initComponents() {
@@ -36,7 +46,16 @@ public class PaymentPanel extends JPanel {
         processButton.addActionListener(e -> processPayment());
 
         JButton refreshButton = StyledComponents.createStyledButton("Refresh", new Color(70, 130, 180));
-        refreshButton.addActionListener(e -> loadUnpaidOrders());
+        refreshButton.addActionListener(e -> {
+            try {
+                loadUnpaidOrders();
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(this,
+                    "Error refreshing orders: " + ex.getMessage(),
+                    "Database Error",
+                    JOptionPane.ERROR_MESSAGE);
+            }
+        });
 
         JButton helpButton = StyledComponents.createStyledButton("Help", new Color(108, 117, 125));
         helpButton.addActionListener(e -> showHelpDialog());
@@ -49,7 +68,7 @@ public class PaymentPanel extends JPanel {
 
         // Create orders table
         String[] columns = {
-                "Customer Name", "Order Type", "Order Date",
+                "Order ID", "Customer Name", "Order Type", "Order Date",
                 "Total Amount", "Status"
         };
         tableModel = new DefaultTableModel(columns, 0) {
@@ -64,11 +83,12 @@ public class PaymentPanel extends JPanel {
         ordersTable.getTableHeader().setReorderingAllowed(false);
 
         // Set column widths
-        ordersTable.getColumnModel().getColumn(0).setPreferredWidth(150); // Customer Name
-        ordersTable.getColumnModel().getColumn(1).setPreferredWidth(100); // Order Type
-        ordersTable.getColumnModel().getColumn(2).setPreferredWidth(120); // Order Date
-        ordersTable.getColumnModel().getColumn(3).setPreferredWidth(100); // Total Amount
-        ordersTable.getColumnModel().getColumn(4).setPreferredWidth(80);  // Status
+        ordersTable.getColumnModel().getColumn(0).setPreferredWidth(80);  // Order ID
+        ordersTable.getColumnModel().getColumn(1).setPreferredWidth(150); // Customer Name
+        ordersTable.getColumnModel().getColumn(2).setPreferredWidth(100); // Order Type
+        ordersTable.getColumnModel().getColumn(3).setPreferredWidth(120); // Order Date
+        ordersTable.getColumnModel().getColumn(4).setPreferredWidth(100); // Total Amount
+        ordersTable.getColumnModel().getColumn(5).setPreferredWidth(80);  // Status
 
         JScrollPane scrollPane = new JScrollPane(ordersTable);
         add(scrollPane, BorderLayout.CENTER);
@@ -84,31 +104,26 @@ public class PaymentPanel extends JPanel {
         });
     }
 
-    private void loadUnpaidOrders() {
+    private void loadUnpaidOrders() throws SQLException {
+        List<Order> allOrders = controller.getAllOrders();
+        List<Order> unpaidOrders = allOrders.stream()
+            .filter(order -> "Pending".equals(order.getPaymentStatus()))
+            .collect(Collectors.toList());
+        
         tableModel.setRowCount(0);
-        try {
-            List<Order> orders = controller.getAllOrders();
+        for (Order order : unpaidOrders) {
+            Customer customer = controller.getCustomerById(order.getCustomerId());
+            double total = controller.calculateOrderTotal(order.getOrderId());
 
-            for (Order order : orders) {
-                if ("Pending".equals(order.getPaymentStatus())) {
-                    Customer customer = controller.getCustomerById(order.getCustomerId());
-                    double total = controller.calculateOrderTotal(order.getOrderId());
-
-                    Object[] row = {
-                            customer.getFirstName() + " " + customer.getLastName(),
-                            order.getOrderType(),
-                            order.getOrderDateTime(),
-                            String.format("₱%.2f", order.getTotalAmount()),
-                            order.getOrderStatus()
-                    };
-                    tableModel.addRow(row);
-                }
-            }
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this,
-                    "Error loading orders: " + e.getMessage(),
-                    "Database Error",
-                    JOptionPane.ERROR_MESSAGE);
+            Object[] row = {
+                    order.getOrderId(),
+                    customer.getFirstName() + " " + customer.getLastName(),
+                    order.getOrderType(),
+                    order.getOrderDateTime(),
+                    String.format("₱%.2f", order.getTotalAmount()),
+                    order.getOrderStatus()
+            };
+            tableModel.addRow(row);
         }
     }
 
@@ -116,58 +131,65 @@ public class PaymentPanel extends JPanel {
         int selectedRow = ordersTable.getSelectedRow();
         if (selectedRow == -1) return;
 
-        int orderId = (int) tableModel.getValueAt(selectedRow, 0);
-        Order order = controller.getOrderById(orderId);
-        if (order == null) return;
+        try {
+            int orderId = (int) tableModel.getValueAt(selectedRow, 0);
+            Order order = controller.getOrderById(orderId);
+            if (order == null) return;
 
-        // Create dialog
-        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-                "Order Details", true);
-        dialog.setLayout(new BorderLayout());
+            // Create dialog
+            JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
+                    "Order Details", true);
+            dialog.setLayout(new BorderLayout());
 
-        // Create order info panel
-        JPanel infoPanel = new JPanel(new GridLayout(0, 2, 5, 5));
-        Customer customer = controller.getCustomerById(order.getCustomerId());
-        infoPanel.add(new JLabel("Customer:"));
-        infoPanel.add(new JLabel(customer.getFirstName() + " " + customer.getLastName()));
-        infoPanel.add(new JLabel("Order Date:"));
-        infoPanel.add(new JLabel(order.getOrderDateTime().toString()));
-        infoPanel.add(new JLabel("Order Type:"));
-        infoPanel.add(new JLabel(order.getOrderType()));
-        infoPanel.add(new JLabel("Status:"));
-        infoPanel.add(new JLabel(order.getOrderStatus()));
-        dialog.add(infoPanel, BorderLayout.NORTH);
+            // Create order info panel
+            JPanel infoPanel = new JPanel(new GridLayout(0, 2, 5, 5));
+            Customer customer = controller.getCustomerById(order.getCustomerId());
+            infoPanel.add(new JLabel("Customer:"));
+            infoPanel.add(new JLabel(customer.getFirstName() + " " + customer.getLastName()));
+            infoPanel.add(new JLabel("Order Date:"));
+            infoPanel.add(new JLabel(order.getOrderDateTime().toString()));
+            infoPanel.add(new JLabel("Order Type:"));
+            infoPanel.add(new JLabel(order.getOrderType()));
+            infoPanel.add(new JLabel("Status:"));
+            infoPanel.add(new JLabel(order.getOrderStatus()));
+            dialog.add(infoPanel, BorderLayout.NORTH);
 
-        // Create items table
-        String[] columns = {"Dish", "Quantity", "Unit Price", "Subtotal"};
-        DefaultTableModel itemsModel = new DefaultTableModel(columns, 0);
-        JTable itemsTable = new JTable(itemsModel);
+            // Create items table
+            String[] columns = {"Dish", "Quantity", "Unit Price", "Subtotal"};
+            DefaultTableModel itemsModel = new DefaultTableModel(columns, 0);
+            JTable itemsTable = new JTable(itemsModel);
 
-        double total = 0;
-        for (OrderItem item : order.getItems()) {
-            double subtotal = item.getQuantity() * item.getPriceAtTime();
-            Object[] row = {
-                    item.getDishName(),
-                    item.getQuantity(),
-                    String.format("₱%.2f", item.getPriceAtTime()),
-                    String.format("₱%.2f", subtotal)
-            };
-            itemsModel.addRow(row);
-            total += subtotal;
+            double total = 0;
+            for (OrderItem item : order.getItems()) {
+                double subtotal = item.getQuantity() * item.getPriceAtTime();
+                Object[] row = {
+                        item.getDishName(),
+                        item.getQuantity(),
+                        String.format("₱%.2f", item.getPriceAtTime()),
+                        String.format("₱%.2f", subtotal)
+                };
+                itemsModel.addRow(row);
+                total += subtotal;
+            }
+
+            JScrollPane scrollPane = new JScrollPane(itemsTable);
+            dialog.add(scrollPane, BorderLayout.CENTER);
+
+            // Create total panel
+            JPanel totalPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            totalPanel.add(new JLabel("Total: " + String.format("₱%.2f", total)));
+            dialog.add(totalPanel, BorderLayout.SOUTH);
+
+            // Set dialog properties
+            dialog.pack();
+            dialog.setLocationRelativeTo(this);
+            dialog.setVisible(true);
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this,
+                "Error loading order details: " + e.getMessage(),
+                "Database Error",
+                JOptionPane.ERROR_MESSAGE);
         }
-
-        JScrollPane scrollPane = new JScrollPane(itemsTable);
-        dialog.add(scrollPane, BorderLayout.CENTER);
-
-        // Create total panel
-        JPanel totalPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        totalPanel.add(new JLabel("Total: " + String.format("₱%.2f", total)));
-        dialog.add(totalPanel, BorderLayout.SOUTH);
-
-        // Set dialog properties
-        dialog.pack();
-        dialog.setLocationRelativeTo(this);
-        dialog.setVisible(true);
     }
 
     private void processPayment() {
