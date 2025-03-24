@@ -296,11 +296,11 @@ public class RestaurantController {
     }
 
     // Order Management
-    public List<Order> getAllOrders() {
+    public List<Order> getAllOrders() throws SQLException {
         return orderDAO.getAllOrders();
     }
 
-    public Order getOrderById(int id) {
+    public Order getOrderById(int id) throws SQLException {
         return orderDAO.getOrderById(id);
     }
 
@@ -339,36 +339,44 @@ public class RestaurantController {
         return orderDAO.cancelOrder(orderId);
     }
 
-    public List<Order> getOrdersByDateRange(String startDate, String endDate) {
+    public List<Order> getOrdersByDateRange(String startDate, String endDate) throws SQLException {
         return orderDAO.getOrdersByDateRange(startDate, endDate);
     }
 
-    public boolean deleteOrder(int orderId) {
+    public boolean deleteOrder(int orderId) throws SQLException {
         return orderDAO.deleteOrder(orderId);
     }
 
+    public List<Order> getDeletedOrders() throws SQLException {
+        return orderDAO.getDeletedOrders();
+    }
+
+    public boolean updatePaymentStatus(int orderId, String paymentMethod, String paymentStatus) throws SQLException {
+        return orderDAO.updatePaymentStatus(orderId, paymentMethod, paymentStatus);
+    }
+
     // Customer Management
-    public List<Customer> getAllCustomers() {
+    public List<Customer> getAllCustomers() throws SQLException {
         return customerDAO.getAllCustomers();
     }
 
-    public Customer getCustomerById(int id) {
+    public Customer getCustomerById(int id) throws SQLException {
         return customerDAO.getCustomerById(id);
     }
 
-    public int addCustomer(Customer customer) {
+    public int addCustomer(Customer customer) throws SQLException {
         return customerDAO.addCustomer(customer);
     }
 
-    public boolean updateCustomer(Customer customer) {
+    public boolean updateCustomer(Customer customer) throws SQLException {
         return customerDAO.updateCustomer(customer);
     }
 
-    public boolean deleteCustomer(int customerId) {
+    public boolean deleteCustomer(int customerId) throws SQLException {
         return customerDAO.deleteCustomer(customerId);
     }
 
-    public List<Order> getCustomerOrders(int customerId) {
+    public List<Order> getCustomerOrders(int customerId) throws SQLException {
         return orderDAO.getOrdersByCustomerId(customerId);
     }
 
@@ -672,31 +680,15 @@ public class RestaurantController {
     }
 
     // Deleted Records Management
-    public List<Customer> getDeletedCustomers() {
+    public List<Customer> getDeletedCustomers() throws SQLException {
         return customerDAO.getDeletedCustomers();
     }
 
-    public List<Order> getDeletedOrders() {
-        return orderDAO.getDeletedOrders();
-    }
-
-    public List<Employee> getDeletedEmployees() {
-        return employeeDAO.getDeletedEmployees();
-    }
-
-    public List<Supplier> getDeletedSuppliers() {
-        return supplierDAO.getDeletedSuppliers();
-    }
-
-    public List<Inventory> getDeletedInventoryItems() throws SQLException {
-        return inventoryDAO.getDeletedInventoryItems();
-    }
-
-    public boolean restoreCustomer(int customerId) {
+    public boolean restoreCustomer(int customerId) throws SQLException {
         return customerDAO.restoreCustomer(customerId);
     }
 
-    public boolean restoreOrder(int orderId) {
+    public boolean restoreOrder(int orderId) throws SQLException {
         return orderDAO.restoreOrder(orderId);
     }
 
