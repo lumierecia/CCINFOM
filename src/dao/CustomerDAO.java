@@ -13,7 +13,7 @@ public class CustomerDAO {
         return DatabaseConnection.getConnection();
     }
 
-    public Customer getCustomerById(int customerId) {
+    public Customer getCustomerById(int customerId) throws SQLException {
         String query = "SELECT * FROM Customers WHERE customer_id = ? AND is_deleted = FALSE";
         
         try (Connection conn = getConnection();
@@ -42,9 +42,9 @@ public class CustomerDAO {
         return null;
     }
 
-    public List<Customer> getAllCustomers() {
+    public List<Customer> getAllCustomers() throws SQLException {
         List<Customer> customers = new ArrayList<>();
-        String query = "SELECT * FROM Customers WHERE is_deleted = FALSE";
+        String query = "SELECT * FROM Customers WHERE is_deleted = FALSE ORDER BY first_name, last_name";
         
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement();
@@ -71,12 +71,14 @@ public class CustomerDAO {
         return customers;
     }
 
-    public int addCustomer(Customer customer) {
-        String query = "INSERT INTO Customers (first_name, last_name, email, phonenumber, address) VALUES (?, ?, ?, ?, ?)";
+    public int addCustomer(Customer customer) throws SQLException {
+        String query = """
+            INSERT INTO Customers (first_name, last_name, email, phone, address)
+            VALUES (?, ?, ?, ?, ?)
+        """;
         
         try (Connection conn = getConnection();
              PreparedStatement stmt = conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
-            
             stmt.setString(1, customer.getFirstName());
             stmt.setString(2, customer.getLastName());
             stmt.setString(3, customer.getEmail());
@@ -84,30 +86,30 @@ public class CustomerDAO {
             stmt.setString(5, customer.getAddress());
             
             int affectedRows = stmt.executeUpdate();
-            if (affectedRows > 0) {
-                try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        customer.setCustomerId(generatedKeys.getInt(1));
-                        return customer.getCustomerId();
-                    }
+            if (affectedRows == 0) {
+                throw new SQLException("Creating customer failed, no rows affected.");
+            }
+
+            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    customer.setCustomerId(generatedKeys.getInt(1));
+                    return customer.getCustomerId();
+                } else {
+                    throw new SQLException("Creating customer failed, no ID obtained.");
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Failed to add customer: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
         }
-        return -1;
     }
 
-    public boolean updateCustomer(Customer customer) {
-        String query = "UPDATE Customers SET first_name = ?, last_name = ?, email = ?, phonenumber = ?, address = ? WHERE customer_id = ?";
+    public boolean updateCustomer(Customer customer) throws SQLException {
+        String query = """
+            UPDATE Customers
+            SET first_name = ?, last_name = ?, email = ?, phone = ?, address = ?
+            WHERE customer_id = ? AND is_deleted = FALSE
+        """;
         
         try (Connection conn = getConnection();
              PreparedStatement stmt = conn.prepareStatement(query)) {
-            
             stmt.setString(1, customer.getFirstName());
             stmt.setString(2, customer.getLastName());
             stmt.setString(3, customer.getEmail());
@@ -116,17 +118,10 @@ public class CustomerDAO {
             stmt.setInt(6, customer.getCustomerId());
             
             return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Failed to update customer: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
-            return false;
         }
     }
 
-    public boolean deleteCustomer(int customerId) {
+    public boolean deleteCustomer(int customerId) throws SQLException {
         // First check if customer has any orders
         String checkQuery = "SELECT COUNT(*) FROM Orders WHERE customer_id = ? AND is_deleted = FALSE";
         
@@ -150,13 +145,6 @@ public class CustomerDAO {
                 updateStmt.setInt(1, customerId);
                 return updateStmt.executeUpdate() > 0;
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Failed to delete customer: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
-            return false;
         }
     }
 
@@ -223,9 +211,9 @@ public class CustomerDAO {
         return orders;
     }
 
-    public List<Customer> getDeletedCustomers() {
+    public List<Customer> getDeletedCustomers() throws SQLException {
         List<Customer> customers = new ArrayList<>();
-        String query = "SELECT * FROM Customers WHERE is_deleted = TRUE";
+        String query = "SELECT * FROM Customers WHERE is_deleted = TRUE ORDER BY first_name, last_name";
         
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement();
@@ -252,7 +240,7 @@ public class CustomerDAO {
         return customers;
     }
 
-    public boolean restoreCustomer(int customerId) {
+    public boolean restoreCustomer(int customerId) throws SQLException {
         String query = "UPDATE Customers SET is_deleted = FALSE WHERE customer_id = ?";
         
         try (Connection conn = getConnection();
@@ -260,13 +248,6 @@ public class CustomerDAO {
             
             stmt.setInt(1, customerId);
             return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                "Failed to restore customer: " + e.getMessage(),
-                "Database Error",
-                JOptionPane.ERROR_MESSAGE);
-            return false;
         }
     }
 } 
